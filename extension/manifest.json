@@ -1,0 +1,27 @@
+{
+  "manifest_version": 3,
+  "name": "Notes Clipper",
+  "version": "1.2.0",
+  "description": "Collect text and image clips from pages, videos, and newsletters into your notes \u2014 or summarize a whole page or video.",
+  "action": {
+    "default_title": "Open Notes Clipper"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "side_panel": {
+    "default_path": "sidepanel.html"
+  },
+  "permissions": [
+    "sidePanel",
+    "downloads",
+    "scripting",
+    "storage",
+    "unlimitedStorage",
+    "tabs",
+    "contextMenus"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ]
+}

@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Notes Clipper</title>
+  <link rel="stylesheet" href="sidepanel.css" />
+</head>
+<body>
+  <header>
+    <h1>Notes Clipper</h1>
+    <div id="page-title" class="page-title">—</div>
+    <div id="page-url" class="page-url">—</div>
+  </header>
+
+  <section class="actions">
+    <button id="add-selection" class="primary">Add selection from page</button>
+    <div class="action-row">
+      <button id="add-image">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="3" width="12" height="10" rx="1.5"/><circle cx="6" cy="6.5" r="1.2"/><path d="M2.5 12l3.5-3.5 2.5 2.5 2-2 3 3"/></svg>
+        Add image
+      </button>
+      <button id="summarize">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 1.75h5.5L12.5 4.75v9.5H4z"/><path d="M9.5 1.75v3h3M6 8h4.5M6 10.5h4.5"/></svg>
+        Add whole page
+      </button>
+    </div>
+    <input id="image-file" type="file" accept="image/*" multiple hidden />
+    <p class="hint-inline" id="summarize-hint">Whole page adds the full text now; the short summary on top is written after you save. ⌘V here pastes a screenshot.</p>
+    <details id="paste-box">
+      <summary>Paste text instead</summary>
+      <textarea id="paste-area" rows="5" placeholder="Paste from a newsletter, email, transcript…"></textarea>
+      <button id="add-paste">Add pasted text</button>
+    </details>
+  </section>
+
+  <section class="clips">
+    <div class="clips-header">
+      <h2>Clips to save <span id="clip-count" class="count">0</span></h2>
+      <button id="clear-all" class="ghost" title="Discard all clips for this page">Clear</button>
+    </div>
+    <div id="clip-list"></div>
+    <p id="empty-hint" class="hint">
+      Select text on the page (or right-click → “Add selection to Notes Clipper”),
+      or add an image. Nothing is saved until you click <strong>Save to notes</strong>.
+    </p>
+  </section>
+
+  <section class="note">
+    <label for="my-note">My note (optional)</label>
+    <textarea id="my-note" rows="3" placeholder="Why this matters, what to connect it to…"></textarea>
+  </section>
+
+  <section id="elsewhere" class="elsewhere" hidden>
+    <h2>Unsaved on other pages <span id="elsewhere-count" class="count">0</span></h2>
+    <div id="elsewhere-list"></div>
+  </section>
+
+  <footer>
+    <button id="save" class="save" disabled>Save to notes</button>
+    <div id="status" class="status"></div>
+  </footer>
+
+  <script src="sidepanel.js"></script>
+</body>
+</html>

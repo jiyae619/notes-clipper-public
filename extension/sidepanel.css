@@ -1,0 +1,350 @@
+:root {
+  --bg: #faf9f7;
+  --card: #ffffff;
+  --ink: #1f2937;
+  --muted: #6b7280;
+  --faint: #9ca3af;
+  --line: #e5e7eb;
+  --line-strong: #d1d5db;
+  --accent: #4f46e5;
+  --accent-soft: #eef2ff;
+  --green: #16a34a;
+  --red: #dc2626;
+  --radius: 8px;
+  /* A strong ease-out: movement starts at once, so a press feels answered. */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  padding: 14px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--ink);
+  background: var(--bg);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-height: 100vh;
+}
+
+/* ---------- header: which page you're clipping ---------- */
+
+header h1 {
+  margin: 0 0 8px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+
+.page-title {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.35;
+  /* Two lines, then an ellipsis: long article titles stay readable. */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.page-url {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---------- buttons: one family, three weights ---------- */
+
+button {
+  font: inherit;
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 8px 12px;
+  background: var(--card);
+  cursor: pointer;
+  transition: transform 160ms var(--ease-out), background-color 160ms ease, border-color 160ms ease;
+}
+
+button:active:not(:disabled) { transform: scale(0.97); }
+button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+@media (hover: hover) and (pointer: fine) {
+  button:hover:not(:disabled) { border-color: var(--line-strong); }
+}
+
+button svg {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+button.primary,
+button.save {
+  width: 100%;
+  padding: 10px 12px;
+  font-weight: 600;
+}
+
+button.primary {
+  background: var(--accent-soft);
+  border-color: transparent;
+  color: var(--accent);
+}
+
+button.save {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  button.primary:hover:not(:disabled) { border-color: var(--accent); }
+  button.save:hover:not(:disabled) { background: #4338ca; border-color: #4338ca; }
+}
+
+button:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+button.save:disabled {
+  opacity: 1;
+  background: var(--line);
+  border-color: var(--line);
+  color: var(--muted);
+}
+
+button.ghost {
+  border: none;
+  background: none;
+  color: var(--muted);
+  padding: 2px 6px;
+  font-size: 12px;
+}
+
+/* ---------- actions ---------- */
+
+.action-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.action-row button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  color: var(--ink);
+}
+
+.action-row button svg { color: var(--muted); }
+
+.hint-inline { color: var(--muted); font-size: 11px; }
+
+/* Under the two buttons: what "whole page" means, and later the feedback for
+   it (sidepanel.js writes here). */
+#summarize-hint { display: block; margin: 8px 0 0; line-height: 1.45; }
+#summarize-hint.ok { color: var(--green); font-weight: 600; }
+#summarize-hint.err { color: var(--red); }
+
+#paste-box { margin-top: 10px; }
+#paste-box summary { color: var(--muted); cursor: pointer; font-size: 12px; width: max-content; }
+#paste-box textarea { margin: 8px 0 6px; }
+
+textarea {
+  width: 100%;
+  font: inherit;
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 8px 10px;
+  resize: vertical;
+  background: var(--card);
+  transition: border-color 160ms ease;
+}
+
+textarea:focus { outline: none; border-color: var(--accent); }
+
+/* ---------- clips ---------- */
+
+.clips-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.clips-header h2 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: 13px;
+}
+
+.count {
+  min-width: 18px;
+  text-align: center;
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-radius: 9px;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 1px 6px;
+}
+
+.clip {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 10px 12px 8px;
+  margin-bottom: 8px;
+}
+
+.clip-text {
+  white-space: pre-wrap;
+  max-height: 110px;
+  overflow-y: auto;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+/* A whole-page grab is a preview, not something to read here: three lines. */
+.clip-page { border-left: 3px solid var(--accent); }
+.clip-page .clip-text {
+  max-height: none;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  color: var(--muted);
+}
+.clip-page .clip-meta span { color: var(--accent); font-weight: 600; }
+
+.clip-img {
+  display: block;
+  max-width: 100%;
+  max-height: 160px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  object-fit: contain;
+  background: var(--bg);
+}
+
+.clip-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 6px;
+  color: var(--faint);
+  font-size: 11px;
+}
+
+.clip-meta .remove {
+  border: none;
+  background: none;
+  color: var(--faint);
+  padding: 0;
+  font-size: 11px;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .clip-meta .remove:hover { color: var(--red); }
+}
+
+.hint {
+  margin: 0;
+  padding: 14px;
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--radius);
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+/* ---------- clips left on other pages ---------- */
+
+.elsewhere h2 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 8px;
+  font-size: 13px;
+}
+
+.elsewhere-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 4px 8px 12px;
+  margin-bottom: 6px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+.elsewhere-info { flex: 1; min-width: 0; }
+
+.elsewhere-title {
+  font-size: 12px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.elsewhere-meta { color: var(--faint); font-size: 11px; }
+
+button.ghost.danger { color: var(--red); font-weight: 600; }
+
+/* ---------- note + footer ---------- */
+
+.note label {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+/* Save and its status stay in view at the bottom of the panel; margin-top
+   auto keeps the note right under the clips instead of the clips list
+   stretching to fill the gap. */
+footer {
+  position: sticky;
+  bottom: 0;
+  margin: auto -14px -14px;
+  padding: 10px 14px 12px;
+  background: var(--bg);
+  border-top: 1px solid var(--line);
+}
+
+.status {
+  min-height: 18px;
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.status.ok { color: var(--green); font-weight: 600; }
+.status.err { color: var(--red); }
+
+@media (prefers-reduced-motion: reduce) {
+  button { transition: background-color 160ms ease, border-color 160ms ease; }
+  button:active:not(:disabled) { transform: none; }
+}

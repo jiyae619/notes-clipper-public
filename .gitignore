@@ -1,0 +1,11 @@
+.DS_Store
+
+# Pre-git manual backups. Left on disk, not tracked — git supersedes them.
+*.bak
+
+# Python bytecode from running the watcher scripts.
+__pycache__/
+
+# Data the build scripts keep beside themselves when run from renderer/ directly.
+renderer/*.json
+
