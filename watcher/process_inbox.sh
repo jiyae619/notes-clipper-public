@@ -66,6 +66,7 @@ max_attempts=3
 max_per_run=10 capped=0
 # Where things live; install.sh records any you changed in watcher.env.
 # NOTES_REFS holds the build scripts and their data (quiz bank, map keywords).
+configured="${NOTES_VAULT:-}"   # empty: settings predate this version (checked below)
 vault="${NOTES_VAULT:-$HOME/Documents/Notes}"
 hw_inbox="$vault/Handwritten/inbox"   # where your phone saves scans
 skills_ref="${NOTES_REFS:-$HOME/.config/notes-clipper/renderer}"
@@ -97,6 +98,12 @@ mkdir -p "$processing" "$done_dir" "$failed" "$skipped" "$needs_review" "$review
 
 if [ -z "$claude_bin" ]; then
   alert setup "The watcher isn't set up (no claude path in ~/.config/notes-clipper/watcher.env). Run watcher/install.sh."
+  exit 1
+fi
+# Settings from an older install name no folders; guessing would file captures
+# into a new, empty notes folder and leave the real one behind.
+if [ -z "$configured" ]; then
+  alert setup "The watcher's settings are from an older version and name no notes folder. Run watcher/install.sh (see the README's Settings)."
   exit 1
 fi
 

@@ -14,6 +14,13 @@
 #                      What's new)                default ~/.config/notes-clipper/renderer
 #   NOTES_ROUTING_MAP  the note in Handwritten/notes/ that says which topic
 #                      gets what                  default Routing_map_note.md
+#   WATCHER_LABEL      the launchd job's name     default com.notes-clipper.watcher
+#
+# Upgrading an install from before these settings existed (a watcher.env with
+# no NOTES_VAULT): the folders it used can't be known from here, so this stops
+# and asks for them rather than quietly switching to the defaults. Its launchd
+# job keeps its name: a job already running this checkout's process_inbox.sh
+# lends its label, so install.sh replaces it instead of adding a second one.
 #
 # Nothing here overwrites a file that exists: a new vault gets the starter
 # layout from starter-vault/, a new NOTES_REFS gets links to renderer/ and an
@@ -24,10 +31,27 @@ repo="$(cd "$here/.." && pwd)"
 env_file="$HOME/.config/notes-clipper/watcher.env"
 
 prev() { [ -f "$env_file" ] || return 0; sed -n "s/^$1=\"\(.*\)\"$/\1/p" "$env_file" | tail -1; }
+if [ -f "$env_file" ] && [ -z "$(prev NOTES_VAULT)" ] && [ -z "${NOTES_VAULT:-}" ]; then
+  cat >&2 <<EOF
+✗ This install was made by an older version, before the folders became settings.
+  Re-run install.sh naming the folders it should keep using, for example:
+    NOTES_VAULT="\$HOME/path/to/notes" NOTES_OUT="\$HOME/path/to/pages" \\
+    NOTES_REFS="\$HOME/path/to/build-scripts" NOTES_ROUTING_MAP="Your_map_note.md" \\
+    bash $here/install.sh
+  Any you leave out get the defaults (see the README's Settings).
+EOF
+  exit 1
+fi
+# A launchd job already running this checkout's watcher (from an earlier install)
+running_label() {
+  grep -l "$here/process_inbox.sh" "$HOME/Library/LaunchAgents/"*.plist 2>/dev/null | head -1 \
+    | xargs -I{} /usr/bin/plutil -extract Label raw {} 2>/dev/null
+}
 vault="${NOTES_VAULT:-$(prev NOTES_VAULT)}"; vault="${vault:-$HOME/Documents/Notes}"
 out="${NOTES_OUT:-$(prev NOTES_OUT)}";       out="${out:-$HOME/Documents/Notes Pages}"
 refs="${NOTES_REFS:-$(prev NOTES_REFS)}";    refs="${refs:-$HOME/.config/notes-clipper/renderer}"
 map="${NOTES_ROUTING_MAP:-$(prev NOTES_ROUTING_MAP)}"; map="${map:-Routing_map_note.md}"
+label="${WATCHER_LABEL:-$(prev WATCHER_LABEL)}"; label="${label:-$(running_label)}"; label="${label:-com.notes-clipper.watcher}"
 
 if [ ! -d "$vault/Handwritten/notes" ]; then
   mkdir -p "$vault"
@@ -46,4 +70,5 @@ if [ ! -f "$refs/build_html.py" ]; then
   echo "• Set up the notes renderer in $refs" >&2
 fi
 
-printf 'NOTES_VAULT="%s"\nNOTES_OUT="%s"\nNOTES_REFS="%s"\nNOTES_ROUTING_MAP="%s"\n' "$vault" "$out" "$refs" "$map"
+printf 'NOTES_VAULT="%s"\nNOTES_OUT="%s"\nNOTES_REFS="%s"\nNOTES_ROUTING_MAP="%s"\nWATCHER_LABEL="%s"\n' \
+  "$vault" "$out" "$refs" "$map" "$label"

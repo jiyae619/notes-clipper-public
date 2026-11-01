@@ -10,16 +10,14 @@
 #       and where the vault, pages and build scripts live (setup_paths.sh)
 #   ~/Library/Application Support/notes-clipper/Notes Clipper Runner.app
 #       the signed launcher launchd starts; macOS folder access is granted to it
-#   ~/Library/LaunchAgents/com.notes-clipper.watcher.plist  (from the template)
+#   ~/Library/LaunchAgents/<WATCHER_LABEL>.plist  (from the template)
 #   ~/.claude/skills/route-capture   a link to skills/route-capture (the /route-capture command)
 #
 # The log and processed/ live in a sibling dir, not inside the inbox. This
 # script migrates them out of the old in-inbox layout if it finds one.
 set -e
 here="$(cd "$(dirname "$0")" && pwd)"
-label="com.notes-clipper.watcher"
-plist_src="$here/$label.plist"
-plist_dst="$HOME/Library/LaunchAgents/$label.plist"
+plist_src="$here/com.notes-clipper.watcher.plist"
 inbox="$HOME/Downloads/notes-inbox"
 processed="$HOME/Downloads/notes-inbox-processed"
 config_dir="$HOME/.config/notes-clipper"
@@ -44,6 +42,8 @@ for tool in python3 pandoc; do
 done
 # Vault, rendered pages and build scripts; see setup_paths.sh for the settings.
 paths="$(bash "$here/setup_paths.sh")"
+label="$(printf '%s\n' "$paths" | sed -n 's/^WATCHER_LABEL="\(.*\)"$/\1/p')"
+plist_dst="$HOME/Library/LaunchAgents/$label.plist"
 cat > "$config_dir/watcher.env" <<EOF
 # Written by watcher/install.sh on $(date '+%Y-%m-%d'). Re-run it to refresh.
 CLAUDE_BIN="$claude_bin"
@@ -69,12 +69,20 @@ fi
 mkdir -p "$HOME/.claude/skills"
 ln -sfn "$here/../skills/route-capture" "$HOME/.claude/skills/route-capture"
 
-sed -e "s|__RUNNER__|$runner|" -e "s|__SCRIPT__|$here/process_inbox.sh|" -e "s|__HOME__|$HOME|g" \
+sed -e "s|__LABEL__|$label|" -e "s|__RUNNER__|$runner|" -e "s|__SCRIPT__|$here/process_inbox.sh|" -e "s|__HOME__|$HOME|g" \
   "$plist_src" > "$plist_dst"
 plutil -lint "$plist_dst" >/dev/null
 
+# One watcher per checkout: a job left from an install under another name
+# would process the same inbox alongside this one, so it goes first.
+for other in $(grep -l "$here/process_inbox.sh" "$HOME/Library/LaunchAgents/"*.plist 2>/dev/null); do
+  old="$(/usr/bin/plutil -extract Label raw "$other" 2>/dev/null)"
+  [ -n "$old" ] && [ "$old" != "$label" ] || continue
+  launchctl bootout "gui/$(id -u)/$old" 2>/dev/null || true
+  rm -f "$other"; echo "• Removed the earlier job $old (it ran this same watcher)"
+done
 launchctl bootout "gui/$(id -u)/$label" 2>/dev/null || true
 launchctl bootstrap "gui/$(id -u)" "$plist_dst"
-launchctl list | grep -q notes-clipper-watcher \
+launchctl print "gui/$(id -u)/$label" >/dev/null 2>&1 \
   && echo "✓ Watcher installed (runs when a capture lands, every 15 min, and once now). If macOS asks whether Notes Clipper Runner may access Downloads and Documents, click Allow. Then save a capture and check $processed/watcher.log" \
-  || { echo "✗ Agent did not load — check: launchctl list | grep notes-clipper"; exit 1; }
+  || { echo "✗ Agent did not load — check: launchctl print gui/$(id -u)/$label"; exit 1; }

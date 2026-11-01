@@ -11,7 +11,9 @@ code with the same instructions (`watcher/route-capture.md`), or they drift
 apart, as archive naming did on 2026-09-03.
 
 Repo: wherever you cloned notes-clipper. Inbox: `~/Downloads/notes-inbox/`. Log:
-`~/Downloads/notes-inbox-processed/watcher.log`.
+`~/Downloads/notes-inbox-processed/watcher.log`. The watcher's launchd job is
+named by `WATCHER_LABEL` in `~/.config/notes-clipper/watcher.env`
+(`com.notes-clipper.watcher` if it isn't set); `<label>` below means that name.
 
 ## Steps
 
@@ -21,12 +23,12 @@ Repo: wherever you cloned notes-clipper. Inbox: `~/Downloads/notes-inbox/`. Log:
 2. **Note where the log ends** (`wc -l` of watcher.log), so you report only
    this run.
 3. **Start the watcher** with
-   `launchctl kickstart gui/$(id -u)/com.notes-clipper.watcher`.
+   `launchctl kickstart gui/$(id -u)/<label>`.
    It runs under Notes Clipper Runner, which holds the macOS folder access. If
    the agent isn't loaded, tell the user to run
    `bash <repo>/watcher/install.sh` and stop.
 4. **Wait for it to finish**: check
-   `launchctl print gui/$(id -u)/com.notes-clipper.watcher` every ~15 s
+   `launchctl print gui/$(id -u)/<label>` every ~15 s
    until `state = not running` (a batch usually takes 2 to 5 minutes; give up
    after 20).
 5. **Report from the new log lines**, per capture:

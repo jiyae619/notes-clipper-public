@@ -4,7 +4,7 @@
 <plist version="1.0">
 <dict>
   <key>Label</key>
-  <string>com.notes-clipper.watcher</string>
+  <string>__LABEL__</string>
   <key>ProgramArguments</key>
   <array>
     <string>__RUNNER__</string>

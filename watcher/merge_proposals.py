@@ -42,6 +42,26 @@ def glossary_in_code():
     return []
 
 
+SAFE_NOTE = re.compile(r"[^\W_][\w .-]*")   # letters and digits in any script; no markup characters
+
+
+def quiz_choices():
+    """The type and level values build_quiz.py accepts, read as literals from it
+    (never executed): it refuses to build the quiz on any other value. None
+    found means none are kept."""
+    try:
+        src = open(os.path.join(args.refs, "build_quiz.py"), encoding="utf-8").read()
+    except OSError:
+        return {}
+    found = {}
+    for node in ast.parse(src).body:
+        if isinstance(node, ast.Assign):
+            for t in node.targets:
+                if getattr(t, "id", "") in ("Q_TYPES", "Q_LEVELS"):
+                    found["type" if t.id == "Q_TYPES" else "level"] = set(ast.literal_eval(node.value))
+    return found
+
+
 notes = {f[: -len("_note.md")]: open(os.path.join(args.notes, f), encoding="utf-8").read().lower()
          for f in os.listdir(args.notes) if f.endswith("_note.md")}
 bank = json.load(open(bank_path, encoding="utf-8"))
@@ -68,6 +88,10 @@ def quiz_problem(e):
         return "not an object"
     if e.get("note") not in notes:
         return f"note {e.get('note')!r} isn't a topic note"
+    # Topic notes are created by the router from captured pages, and the note
+    # name ends up in pages, links and ids: plain names only.
+    if not SAFE_NOTE.fullmatch(e["note"]):
+        return f"note name {e['note']!r} has characters a page name can't carry"
     for k in ("topic", "src", "q", "explain"):
         if not isinstance(e.get(k), str) or not e[k].strip():
             return f"missing {k}"
@@ -99,6 +123,7 @@ def keyword_problem(k):
     return None
 
 
+choices = quiz_choices()
 added_q, added_k, dropped = [], [], []
 for path in args.proposals:
     try:
@@ -112,7 +137,7 @@ for path in args.proposals:
             dropped.append(f"quiz {str(e.get('q', ''))[:50]!r}: {why}" if isinstance(e, dict) else f"quiz entry: {why}")
             continue
         entry = {"id": next_id(e["note"]), **{k: e[k] for k in ("note", "topic", "src")},
-                 **{k: e[k] for k in ("type", "level") if isinstance(e.get(k), str)},
+                 **{k: e[k] for k in ("type", "level") if isinstance(e.get(k), str) and e[k] in choices.get(k, ())},
                  "q": e["q"].strip(), "opts": [o.strip() for o in e["opts"]], "a": e["a"], "explain": e["explain"].strip()}
         bank.append(entry)
         seen_q.add(re.sub(r"\s+", " ", entry["q"]).lower())

@@ -2,7 +2,14 @@
 """Render quiz-bank.json into a self-contained MCQ flashcard app.
 10 questions/round, instant right/wrong + explanation w/ source, ⭐ save-to-review (localStorage).
 Output: $NOTES_OUT/handwritten-quiz.html . Re-run after editing quiz-bank.json."""
-import os, json, html
+import os, json, html, glob, sys
+sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
+import pages
+
+def js_json(obj, **kw):
+    """JSON for embedding inside <script>: '<' is escaped, so text from a capture
+    (a quiz question, a title, a keyword) can never close the tag and start its own."""
+    return json.dumps(obj, **kw).replace("<", "\\u003c")
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 BANK = os.path.join(HERE, "quiz-bank.json")
@@ -31,6 +38,10 @@ if errs:
 # sorted case-insensitively, minus the downloaded reference docs. The bank keeps
 # the real filenames so every question stays traceable to its scan.
 ARCHIVE = os.path.join(os.path.expanduser(os.environ.get("NOTES_VAULT", "~/Documents/Notes")), "Handwritten/archive")
+# The page each note's questions link to: the same rule build_html.py writes pages by.
+_NOTES_DIR = os.path.join(os.path.dirname(ARCHIVE), "notes")
+PAGES = {pages.stem_of(f): p for f, p in pages.page_names(
+    os.path.basename(x) for x in glob.glob(os.path.join(_NOTES_DIR, "*.md"))).items()}
 # Filenames of PDFs in archive/ that are published documents, not your scans,
 # shown under their own names. Keep in step with build_html.py.
 _OFFICIAL_DOCS = set()
@@ -118,8 +129,10 @@ const byId=id=>BANK.find(q=>q.id===id);
 const NOTES=[...new Set(BANK.map(q=>q.note))];
 const NICE={};   // display names for note stems, e.g. {PM_UX:'PM / UX'}
 const nice=n=>NICE[n]||n.replace(/_/g,' ');
-const slug=n=>'handwritten-'+n.toLowerCase().replace(/_/g,'-')+'.html';
-const esc=s=>s.replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+// Each note's page, as build_html.py names it (pages.py); the index if it's gone.
+const slug=n=>PAGES[n]||'handwritten-notes-index.html';
+// Every value from the bank came from a capture: escape it wherever it goes into HTML.
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const shuffle=a=>{a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;};
 const cnt=()=>{const c={};BANK.forEach(q=>c[q.note]=(c[q.note]||0)+1);return c;};
 let S=null, keyEnabled=false;
@@ -128,7 +141,7 @@ function home(){
   saved=getSaved(); keyEnabled=false;
   const c=cnt();
   const opts=['<option value="__all">All topics ('+BANK.length+')</option>']
-    .concat(NOTES.map(n=>'<option value="'+n+'">'+nice(n)+' ('+c[n]+')</option>')).join('');
+    .concat(NOTES.map(n=>'<option value="'+esc(n)+'">'+esc(nice(n))+' ('+c[n]+')</option>')).join('');
   app.innerHTML=`<div class="card">
     <h1>📝 Flashcard quiz</h1>
     <p class="lead">Multiple choice from your handwritten &amp; note archive. 10 per round · instant feedback with the source · ⭐ save any question to review next time.</p>
@@ -167,14 +180,14 @@ function renderQ(){
   const it=S.items[S.idx], q=it.q, n=S.items.length;
   const pct=Math.round(S.idx/n*100);
   const lv=q.level||'recall', ty=q.type||'recall';
-  const badges=(ty!=='recall'?`<span class="tag ty">${esc(ty)}</span>`:'')+`<span class="tag lv-${lv}">${lv}</span>`;
+  const badges=(ty!=='recall'?`<span class="tag ty">${esc(ty)}</span>`:'')+`<span class="tag lv-${esc(lv)}">${esc(lv)}</span>`;
   const optHTML=it.order.map((oi,pos)=>{
     return `<button class="opt" data-pos="${pos}" ${it.chosen!=null?'disabled':''}>
       <span class="k">${pos+1}</span>${esc(q.opts[oi])}<span class="mark"></span></button>`;
   }).join('');
   app.innerHTML=`<div class="card">
     <div class="prog"><i style="width:${pct}%"></i></div>
-    <div class="qmeta"><span class="chip">${nice(q.note)}</span><span>${esc(q.topic)}</span>${badges}<span class="sp" style="margin-left:auto">${S.idx+1} / ${n}</span></div>
+    <div class="qmeta"><span class="chip">${esc(nice(q.note))}</span><span>${esc(q.topic)}</span>${badges}<span class="sp" style="margin-left:auto">${S.idx+1} / ${n}</span></div>
     <div class="q">${esc(q.q)}</div>
     <div id="opts">${optHTML}</div>
     <div id="after"></div>
@@ -196,7 +209,7 @@ function answer(pos){
     <div class="exp ${correct?'ok':'bad'}">
       <div class="verdict">${correct?'✓ Correct':'✗ Not quite'}</div>
       <div>${esc(q.explain)}</div>
-      <div class="src">📄 <a href="${slug(q.note)}">${nice(q.note)}</a> · ${esc(q.topic)} · <b>source:</b> ${esc(q.src)}</div>
+      <div class="src">📄 <a href="${esc(slug(q.note))}">${esc(nice(q.note))}</a> · ${esc(q.topic)} · <b>source:</b> ${esc(q.src)}</div>
     </div>
     <div class="footer">
       <button class="btn" id="next">${last?'See results':'Next →'}</button>
@@ -223,8 +236,8 @@ function end(){
   const missHTML=missed.length?('<h3 style="margin-top:22px;font-size:16px">Review these '+missed.length+'</h3>'+
     missed.map(it=>`<div class="missed"><div class="m-q">${esc(it.q.q)}</div>
       <div class="m-a">✓ ${esc(it.q.opts[it.q.a])}</div>
-      <div class="src">📄 <a href="${slug(it.q.note)}">${nice(it.q.note)}</a> · source: ${esc(it.q.src)}
-      &nbsp;<button class="savebtn ${saved.has(it.q.id)?'on':''}" data-sv="${it.q.id}">${saved.has(it.q.id)?'★ Saved':'☆ Save'}</button></div></div>`).join(''))
+      <div class="src">📄 <a href="${esc(slug(it.q.note))}">${esc(nice(it.q.note))}</a> · source: ${esc(it.q.src)}
+      &nbsp;<button class="savebtn ${saved.has(it.q.id)?'on':''}" data-sv="${esc(it.q.id)}">${saved.has(it.q.id)?'★ Saved':'☆ Save'}</button></div></div>`).join(''))
     :'<p class="lead" style="margin-top:18px">Clean sweep — nothing to review. 🎯</p>';
   app.innerHTML=`<div class="card">
     <div style="text-align:center">
@@ -265,7 +278,7 @@ doc = ('<!doctype html><html lang="en"><head><meta charset="utf-8">'
  '<span style="font-weight:700">📝 Quiz</span>'
  '<span class="sp">grounded in Handwritten/notes/</span></header>'
  '<div class="wrap"><div id="app"></div></div>'
- '<script>const BANK='+json.dumps(bank, ensure_ascii=False)+';'+APP+'</script></body></html>')
+ '<script>const BANK='+js_json(bank, ensure_ascii=False)+';const PAGES='+js_json(PAGES, ensure_ascii=False)+';'+APP+'</script></body></html>')
 
 os.makedirs(os.path.dirname(OUT), exist_ok=True)
 open(OUT,"w",encoding="utf-8").write(doc)

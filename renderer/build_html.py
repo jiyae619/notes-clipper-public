@@ -2,7 +2,14 @@
 """Render Handwritten/notes/*.md into styled HTML previews with a tab menu,
 per-page section nav (TOC), and a keyword knowledge map.
 Output: $NOTES_OUT/handwritten-*.html . Reusable each round."""
-import os, re, math, subprocess, urllib.parse, html, json, glob, datetime, shutil
+import os, re, math, subprocess, urllib.parse, html, json, glob, datetime, shutil, sys
+sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
+import pages
+
+def js_json(obj, **kw):
+    """JSON for embedding inside <script>: '<' is escaped, so text from a capture
+    (a quiz question, a title, a keyword) can never close the tag and start its own."""
+    return json.dumps(obj, **kw).replace("<", "\\u003c")
 
 # Paths come from the environment (the watcher sets them from watcher.env);
 # the defaults are the README's standard layout.
@@ -39,6 +46,7 @@ esc = lambda s: html.escape(s or "", quote=True)
 PREF = []   # e.g. ["Routing_map_note.md"]; notes not listed follow alphabetically
 found = sorted(os.path.basename(p) for p in glob.glob(os.path.join(NOTES_DIR,"*.md")))
 NOTE_FILES = [f for f in PREF if f in found] + [f for f in found if f not in PREF]
+PAGES = pages.page_names(found)
 
 PALETTE = ["#3b5bdb","#0ca678","#e8590c","#ae3ec9","#1098ad","#d6336c","#5c7cfa","#2b8a3e"]
 WORD = {"ai":"AI","agi":"AGI","pm":"PM","ux":"UX","rag":"RAG","llm":"LLM","iam":"IAM"}
@@ -46,8 +54,7 @@ def label_of(fn):
     base = fn[:-len("_note.md")] if fn.endswith("_note.md") else fn[:-3]
     return " ".join(WORD.get(w.lower(), w.capitalize()) for w in base.replace("_"," ").split())
 def slug_of(fn):
-    base = fn[:-len("_note.md")] if fn.endswith("_note.md") else fn[:-3]
-    return "handwritten-" + base.lower().replace("_","-").replace(" ","-") + ".html"
+    return PAGES[fn]   # one rule with build_quiz.py: see pages.py
 
 # Concepts the knowledge map always looks for. Routing adds more per capture
 # (glossary-extra.json), so this can start empty; add terms you care about.
@@ -170,7 +177,10 @@ def fm_sources(fm):
     return [(a or b or c).strip() for a,b,c in items if (a or b or c).strip().lower().endswith(".pdf")]
 
 def pdf_link(name, anchor):
-    url = "file://" + urllib.parse.quote(os.path.join(ARCHIVE, name)) + (anchor or "")
+    # The #fragment comes from the note, and this link goes back in after the
+    # sanitizer, so it is URL-encoded too (= and & kept: #page=3 still works).
+    frag = "#" + urllib.parse.quote(anchor[1:], safe="=&") if anchor else ""
+    url = "file://" + urllib.parse.quote(os.path.join(ARCHIVE, name)) + frag
     label = SCAN_LABEL.get(name, name)
     return f'<a href="{url}" target="_blank" title="{esc(name)}">📄 {esc(label)}</a>'
 def _dedent(block):
@@ -202,6 +212,39 @@ def srcchip(name):
     label = SCAN_LABEL.get(name, stem)
     return f'<a class="srcchip" href="{url}" target="_blank" title="source: {esc(stem)}">{esc(label)}</a>'
 
+# Notes are written from captured web pages, and pandoc passes raw HTML through
+# as is, so its output is filtered: formatting tags only, no event handlers or
+# javascript: links. Anything else is shown as text, never run. Runs before the
+# script's own trusted fragments (diagrams, source chips) are put back.
+from html.parser import HTMLParser
+_TAGS = set("p h1 h2 h3 h4 h5 h6 ul ol li a em strong i b u s del ins mark sup sub small kbd code pre "
+            "blockquote hr br img span div table thead tbody tfoot tr th td col colgroup caption "
+            "dl dt dd figure figcaption details summary input label".split())
+_ATTRS = set("href src alt title id class colspan rowspan align style start type checked disabled width height".split())
+_URL_OK = re.compile(r"^(?:https?:|mailto:|file:|#|/|\.|[^:/?#]*(?:[/?#]|$))", re.I)
+class _Clean(HTMLParser):
+    def __init__(self):
+        super().__init__(convert_charrefs=False); self.out = []
+    def _tag(self, tag, attrs, close=""):
+        keep = []
+        for k, v in attrs:
+            v = v or ""
+            if k not in _ATTRS or (k in ("href", "src") and not _URL_OK.match(v.strip())):
+                continue
+            keep.append(f' {k}="{html.escape(v, quote=True)}"')
+        return f"<{tag}{''.join(keep)}{close}>"
+    def handle_starttag(self, tag, attrs):
+        self.out.append(self._tag(tag, attrs) if tag in _TAGS else html.escape(self.get_starttag_text()))
+    def handle_startendtag(self, tag, attrs):
+        self.out.append(self._tag(tag, attrs, "/") if tag in _TAGS else html.escape(self.get_starttag_text()))
+    def handle_endtag(self, tag):
+        self.out.append(f"</{tag}>" if tag in _TAGS else html.escape(f"</{tag}>"))
+    def handle_data(self, d): self.out.append(d.replace("<", "&lt;").replace(">", "&gt;"))
+    def handle_entityref(self, n): self.out.append(f"&{n};")
+    def handle_charref(self, n): self.out.append(f"&#{n};")
+def _sanitize(h):
+    p = _Clean(); p.feed(h); p.close(); return "".join(p.out)
+
 def md_to_html(body, sources=()):
     store = {}
     def put(frag):
@@ -225,7 +268,7 @@ def md_to_html(body, sources=()):
     body = re.sub(r"\[\[([^\]]+?)\]\]", lambda m: m.group(1), body)  # plain wikilinks -> text
     r = subprocess.run(["pandoc","--from","gfm","--to","html","--wrap=none"], input=body, capture_output=True, text=True)
     if r.returncode: raise RuntimeError(r.stderr)
-    h = r.stdout
+    h = _sanitize(r.stdout)
     seen={}
     def fix(m):
         lvl,attrs,inner = m.groups()
@@ -439,7 +482,7 @@ if os.path.exists(ROUTES_FILE):
 with open(STATE_FILE, "w", encoding="utf-8") as fh: json.dump(cur_state, fh, ensure_ascii=False, indent=1)
 
 def _whatsnew_snippet(feed):
-    data = json.dumps(feed, ensure_ascii=False)
+    data = js_json(feed, ensure_ascii=False)
     return ("""<style>
 #wn-fab{position:fixed;right:18px;bottom:18px;z-index:60;background:#3b5bdb;color:#fff;border:none;border-radius:22px;padding:10px 15px;font:600 13px -apple-system,BlinkMacSystemFont,sans-serif;box-shadow:0 6px 18px rgba(59,91,219,.35);cursor:pointer;display:none}
 #wn-fab .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#ffd43b;margin-left:7px;vertical-align:middle}
@@ -500,7 +543,7 @@ if(unseen.length){show(unseen);}else{dot.style.display='none';}
 WN_SNIPPET = _whatsnew_snippet(_feed)
 
 MERMAID_SNIPPET = ("""<script src="mermaid.min.js"></script>"""
-  """<script>mermaid.initialize({startOnLoad:false,securityLevel:'loose',theme:'base',"""
+  """<script>mermaid.initialize({startOnLoad:false,securityLevel:'strict',theme:'base',"""
   """themeVariables:{fontFamily:'-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif',fontSize:'14px',"""
   """primaryColor:'#eef1fb',primaryBorderColor:'#3b5bdb',primaryTextColor:'#1f2430',"""
   """lineColor:'#6b7280',secondaryColor:'#f6f7f9',tertiaryColor:'#fff'},"""
@@ -561,7 +604,7 @@ SEARCH_JS = """<script src="handwritten-search-index.js"></script>
   function render(q){
     if(!hits.length){ res.innerHTML='<div class="qempty">No matches for \u201c'+esc(q)+'\u201d</div>'; res.classList.add('on'); return; }
     var h = hits.map(function(e,n){
-      return '<a class="qr'+(n===sel?' sel':'')+'" href="'+e.p+'?q='+encodeURIComponent(q)+'#'+e.i+'">'
+      return '<a class="qr'+(n===sel?' sel':'')+'" href="'+esc(e.p)+'?q='+encodeURIComponent(q)+'#'+esc(e.i)+'">'
            + '<div class="qn">'+esc(e.l)+'</div>'
            + '<div class="qt">'+hl(e.t,q)+'</div>'
            + '<div class="qx">'+hl(snip(e.x,q),q)+'</div></a>'; }).join('');
@@ -740,7 +783,7 @@ FAV_NOTE, FAV_MAP, FAV_QUIZ = favicon("\U0001F4D3"), favicon("\U0001F578"), favi
 def tabbar(cur):
     t = '<a class="home" href="%s">📓 Notes</a>' % INDEX
     for n in notes:
-        t += f'<a class="tab {"active" if n["out"]==cur else ""}" href="{n["out"]}">{esc(n["label"])}</a>'
+        t += f'<a class="tab {"active" if n["out"]==cur else ""}" href="{esc(n["out"])}">{esc(n["label"])}</a>'
     t += f'<a class="tab map pill" href="{MAP}">🕸 Map</a>'
     t += f'<a class="tab pill" href="{QUIZ}">📝 Quiz</a>'
     t += SEARCH_BOX
@@ -749,7 +792,7 @@ def tabbar(cur):
 # ---- shared search index (one file, loaded by every page) ----
 SEARCH_INDEX = [e for n in notes for e in n["idx"]]
 with open(os.path.join(OUT, "handwritten-search-index.js"), "w", encoding="utf-8") as fh:
-    fh.write("window.SEARCH_INDEX=" + json.dumps(SEARCH_INDEX, ensure_ascii=False, separators=(",", ":")) + ";")
+    fh.write("window.SEARCH_INDEX=" + js_json(SEARCH_INDEX, ensure_ascii=False, separators=(",", ":")) + ";")
 print("search index:", len(SEARCH_INDEX), "sections across", len(notes), "notes")
 
 # ---- write per-note pages ----
@@ -765,7 +808,7 @@ for n in notes:
 
 # ---- index hub ----
 cards="".join(
- f'<a class="cardlink" href="{n["out"]}"><h3>{esc(n["title"])}</h3><p>{esc(" · ".join(n["secs"][:6]))}</p>'
+ f'<a class="cardlink" href="{esc(n["out"])}"><h3>{esc(n["title"])}</h3><p>{esc(" · ".join(n["secs"][:6]))}</p>'
  f'<div class="c">{n["nsrc"]} source scans · {len(n["secs"])} sections</div></a>' for n in notes)
 idx = f"""<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Notes</title>{FAV_NOTE}<style>{CSS}</style></head><body>
 <header class="bar"><a class="home" href="{INDEX}">📓 Notes</a>{SEARCH_BOX}</header>
@@ -819,7 +862,7 @@ for a in _elig:
 for (a,b),sc in _pairs.items():
     glinks.append({"s":"kw:"+a,"t":"kw:"+b,"w":sc,"kk":1})
 
-GRAPH=json.dumps({"nodes":gnodes,"links":glinks})
+GRAPH=js_json({"nodes":gnodes,"links":glinks})
 
 MAPJS = r"""
 const idx={}; GRAPH.nodes.forEach((n,i)=>idx[n.id]=i);
@@ -886,7 +929,7 @@ function card(i){
       +'<div class="ck">Concept</div><h3>'+cesc(n.label)+'</h3>'
       +'<div class="cmeta">appears in '+ns.length+' of '+N.filter(m=>m.type==='note').length+' notes</div>'
       +'<div class="csec">In these notes</div>'
-      + ns.map(m=>'<a class="cn" href="'+m.url+'">'+cesc(m.label)+'</a>').join('');
+      + ns.map(m=>'<a class="cn" href="'+cesc(m.url)+'">'+cesc(m.label)+'</a>').join('');
   if(co.length) h+='<div class="csec">Often appears with</div>'
       + co.map(o=>'<button class="chip" data-i="'+o.i+'">'+cesc(N[o.i].label)+(o.c>1?' \u00b7 '+o.c:'')+'</button>').join('');
   CARD.innerHTML=h; CARD.classList.add('on');

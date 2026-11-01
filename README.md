@@ -291,8 +291,13 @@ bash tests/run.sh
 
 The watcher tests run `process_inbox.sh` against sample captures in a throwaway
 home folder, with stand-ins for Claude, yt-dlp, the Keychain and notifications,
-so they never touch your inbox, token, usage or screen. One test runs the real
-page builder end to end, so it needs pandoc. The extension tests load the side
+so they never touch your inbox, token, usage or screen. The install tests run
+`install.sh` and `uninstall.sh` against a stand-in `launchctl`, including
+upgrading an older install. The page-builder tests run the real build scripts
+(they need pandoc) and check that text from a capture can never run as code in
+the pages. The browser tests plant code in every field a capture can reach, then
+have headless Google Chrome play the quiz, open every map card, What's new and
+search, and fail if any of it runs. Without Chrome they report SKIPPED. The extension tests load the side
 panel's code in a sandbox and check the markdown it writes.
 
 ## Known limits

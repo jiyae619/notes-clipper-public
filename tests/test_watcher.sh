@@ -80,7 +80,7 @@ EOF
   printf '#!/bin/bash\nexit 44\n' > "$H/stubs/security"
   printf '#!/bin/bash\necho "$1" >> "$HOME/alerts"\n' > "$H/stubs/notify"
   chmod +x "$H/stubs/"*
-  printf 'CLAUDE_BIN="%s"\nWATCHER_PATH="%s"\n' "$H/stubs/claude" "$H/stubs:/usr/bin:/bin" \
+  printf 'CLAUDE_BIN="%s"\nWATCHER_PATH="%s"\nNOTES_VAULT="%s"\n' "$H/stubs/claude" "$H/stubs:/usr/bin:/bin" "$H/Documents/Notes" \
     > "$H/.config/notes-clipper/watcher.env"
 }
 
@@ -255,6 +255,12 @@ new_home; cap a; rm "$H/.config/notes-clipper/watcher.env"; run
 check "a missing install config alerts and exits 1" eval '[ $rc = 1 ] && alerted "isn.t set up"'
 done_home
 
+# Upgrading: settings written before the folders were settings name no notes folder.
+new_home; cap a; sed -i '' '/^NOTES_VAULT=/d' "$H/.config/notes-clipper/watcher.env"; run
+check "settings from an older install (no NOTES_VAULT) alert and route nothing, rather than filing into a new empty folder" \
+  eval '[ $rc = 1 ] && alerted "older version" && [ -e "$IN/a.md" ] && [ ! -e "$H/claude.args" ]'
+done_home
+
 new_home; cap a; CLAUDE_LOGGED_IN=false run
 check "a signed-out claude alerts and leaves the capture in the inbox" \
   eval '[ $rc = 1 ] && alerted "signed in" && [ -e "$IN/a.md" ]'
@@ -322,6 +328,37 @@ check "keywords: one in most notes ('design') is too common, one already mapped 
   eval 'grep -q "design.: too common" "$H/out" && grep -q "agent.: already on the map" "$H/out" && grep -q "long tail" "$R/glossary-extra.json" && ! grep -q "\"design\"" "$R/glossary-extra.json"'
 done_home
 
+# A proposal field the quiz page doesn't accept must not reach the bank: the
+# quiz builds first, so one bad entry would stop every later rebuild.
+new_home; N="$H/Documents/Notes/Handwritten/notes"; echo "a note" > "$N/Topic_note.md"
+rm "$R/build_quiz.py"; ln -s "$here/../renderer/build_quiz.py" "$R/build_quiz.py"
+echo '{"quiz":[{"note":"Topic","topic":"t","src":"s","q":"Odd level?","opts":["a","b","c","d"],"a":0,"explain":"e","level":"advanced","type":"essay"},{"note":"Topic","topic":"t","src":"s","q":"Good level?","opts":["a","b","c","d"],"a":0,"explain":"e","level":"apply","type":"scenario"}]}' > "$H/p.json"
+python3 "$here/../watcher/merge_proposals.py" --refs "$R" --notes "$N" "$H/p.json" > "$H/out" 2>&1
+check "a quiz proposal's unknown type or level is dropped, known ones kept, so the quiz page still builds" \
+  eval 'python3 -c "
+import json,sys; b={q[\"q\"]: q for q in json.load(open(sys.argv[1]))}
+assert \"level\" not in b[\"Odd level?\"] and \"type\" not in b[\"Odd level?\"]
+assert b[\"Good level?\"][\"level\"]==\"apply\" and b[\"Good level?\"][\"type\"]==\"scenario\"
+" "$R/quiz-bank.json" && HOME="$H" NOTES_OUT="$H/pages" python3 "$R/build_quiz.py" >> "$H/out" 2>&1'
+done_home
+
+new_home; N="$H/Documents/Notes/Handwritten/notes"; echo "a note" > "$N/Topic_note.md"; echo "odd" > "$N/Odd<img src=x>_note.md"
+rm "$R/build_quiz.py"; ln -s "$here/../renderer/build_quiz.py" "$R/build_quiz.py"
+echo '{"quiz":[{"note":"Topic","topic":"t","src":"s","q":"List type?","opts":["a","b","c","d"],"a":0,"explain":"e","type":[],"level":{}},{"note":"Odd<img src=x>","topic":"t","src":"s","q":"Odd note?","opts":["a","b","c","d"],"a":0,"explain":"e"},{"note":"Topic","topic":"t","src":"s","q":"Fine?","opts":["a","b","c","d"],"a":0,"explain":"e"}],"keywords":["a note"]}' > "$H/p.json"
+python3 "$here/../watcher/merge_proposals.py" --refs "$R" --notes "$N" "$H/p.json" > "$H/out" 2>&1; rc=$?
+check "R4-2: a type or level that isn't text is dropped, not a crash that loses the whole merge" \
+  eval '[ $rc = 0 ] && python3 -c "
+import json,sys; b={q[\"q\"]: q for q in json.load(open(sys.argv[1]))}
+assert \"type\" not in b[\"List type?\"] and \"level\" not in b[\"List type?\"] and \"Fine?\" in b
+" "$R/quiz-bank.json"'
+check "a quiz proposal for a topic note with an unsafe name is dropped, with the reason" \
+  eval '! grep -q "Odd note" "$R/quiz-bank.json" && grep -q "Odd note.*name" "$H/out"'
+echo "개념" > "$N/기초 개념_note.md"
+echo '{"quiz":[{"note":"기초 개념","topic":"t","src":"s","q":"Korean note?","opts":["a","b","c","d"],"a":0,"explain":"e"}]}' > "$H/p2.json"
+python3 "$here/../watcher/merge_proposals.py" --refs "$R" --notes "$N" "$H/p2.json" >> "$H/out" 2>&1
+check "...while a note named in another script (Korean here) keeps its quiz questions" eval 'grep -q "Korean note" "$R/quiz-bank.json"'
+done_home
+
 new_home; cap a; cap b; CLAUDE_SKIP=b run
 check "a failed capture's proposals aren't applied (its content never reached the notes)" \
   eval 'grep -q "What did a add" "$R/quiz-bank.json" && ! grep -q "What did b add" "$R/quiz-bank.json"'
@@ -377,7 +414,21 @@ check "re-running install overwrites nothing: your notes and quiz bank survive" 
 done_home
 
 H="$(mktemp -d)"; mkdir -p "$H/.config/notes-clipper"
+printf 'CLAUDE_BIN="/x/claude"\nWATCHER_PATH="/usr/bin"\n' > "$H/.config/notes-clipper/watcher.env"   # what the old install.sh wrote
+setup > "$H/paths"; rc=$?
+check "upgrading an older install stops and asks which folders to keep, creating nothing" \
+  eval '[ $rc = 1 ] && grep -q "older version" "$H/out" && [ ! -s "$H/paths" ] && [ ! -e "$H/Documents/Notes" ] && [ ! -e "$H/.config/notes-clipper/renderer" ]'
+W="$(cd "$here/../watcher" && pwd)"; mkdir -p "$H/Library/LaunchAgents"
+printf '<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0"><dict><key>Label</key><string>com.example.legacy</string><key>ProgramArguments</key><array><string>%s/process_inbox.sh</string></array></dict></plist>\n' "$W" > "$H/Library/LaunchAgents/com.example.legacy.plist"
+NOTES_VAULT="$H/Kept" setup > "$H/paths"
+check "...and with the folder named, it keeps that folder and the old job's name (no second watcher)" \
+  eval 'grep -qx "NOTES_VAULT=\"$H/Kept\"" "$H/paths" && grep -qx "WATCHER_LABEL=\"com.example.legacy\"" "$H/paths"'
+done_home
+
+H="$(mktemp -d)"; mkdir -p "$H/.config/notes-clipper"
 NOTES_VAULT="$H/Notes" setup > "$H/.config/notes-clipper/watcher.env"; setup > "$H/paths"
+check "an existing install keeps its launchd job name (WATCHER_LABEL), so /route-capture still finds it" \
+  eval 'echo "WATCHER_LABEL=\"com.example.old\"" >> "$H/.config/notes-clipper/watcher.env"; setup | grep -qx "WATCHER_LABEL=\"com.example.old\""'
 check "a vault you chose once (NOTES_VAULT=... install.sh) is kept by later re-installs" \
   eval 'grep -qx "NOTES_VAULT=\"$H/Notes\"" "$H/paths" && [ -e "$H/Notes/Handwritten/notes/Routing_map_note.md" ] && [ ! -e "$H/Documents/Notes" ]'
 done_home

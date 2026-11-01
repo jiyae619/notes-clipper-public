@@ -36,7 +36,7 @@ top of the archived file, above the full verbatim text, written for skimming at
 a glance: a few sentences, not a substitute for the text below it.
 
 Then integrate a deduped summary into the right topic note(s) under
-Handwritten/notes/ per the routing map in {{ROUTING_MAP}}; follow its rules. Merge into the
+Handwritten/notes/ per the routing map in {{ROUTING_MAP}}. Merge into the
 matching section: state each idea once, keep complementary detail, and flag a
 conflict with what the note already says rather than blending the two. Always
 cite the source and the archive file (archive/<slug>.md) in that note's
