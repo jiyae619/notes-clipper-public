@@ -64,6 +64,18 @@ check "a custom job name installs and is verified under that name" \
   eval '[ $rc = 0 ] && [ "$(jobs)" = "com.example.mine " ] && [ "$(setting WATCHER_LABEL)" = com.example.mine ]'
 rm -rf "$H"
 
+new_home; printf '#!/bin/bash\necho stub\n' > "$H/stubs/codex"; chmod +x "$H/stubs/codex"
+install NOTES_AGENT=codex CODEX_BIN="$H/stubs/codex" CODEX_MODEL=gpt-test CLAUDE_BIN=
+check "Codex: installs with NOTES_AGENT=codex and no Claude, recording codex's path and model" \
+  eval '[ $rc = 0 ] && [ "$(setting NOTES_AGENT)" = codex ] && [ "$(setting CODEX_BIN)" = "$H/stubs/codex" ] && [ "$(setting CODEX_MODEL)" = gpt-test ] && [ -z "$(setting CLAUDE_BIN)" ]'
+install CLAUDE_BIN=
+check "...and a re-install keeps Codex without being told again" eval '[ $rc = 0 ] && [ "$(setting NOTES_AGENT)" = codex ]'
+rm -rf "$H"
+
+new_home; install NOTES_AGENT=gemini
+check "an unknown agent is refused with the choices named" eval '[ $rc = 1 ] && grep -q "claude or codex" "$H/out"'
+rm -rf "$H"
+
 # ---- upgrading an install made before the settings existed --------------------
 
 new_home; legacy_job com.example.legacy; install

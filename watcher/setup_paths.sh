@@ -15,8 +15,10 @@
 #   NOTES_ROUTING_MAP  the note in Handwritten/notes/ that says which topic
 #                      gets what                  default Routing_map_note.md
 #   WATCHER_LABEL      the launchd job's name     default com.notes-clipper.watcher
-#   CLAUDE_MODEL       the model every Claude call uses, e.g. claude-opus-5-5
-#                                                 default: unset (Claude's own default)
+#   NOTES_AGENT        claude (Claude Code) or codex (OpenAI's Codex CLI)
+#                                                 default claude
+#   CLAUDE_MODEL       the model Claude uses, e.g. claude-opus-5-5
+#   CODEX_MODEL        the model Codex uses       defaults: unset (the agent's own)
 #
 # Upgrading an install from before these settings existed (a watcher.env with
 # no NOTES_VAULT): the folders it used can't be known from here, so this stops
@@ -56,7 +58,10 @@ vault="${NOTES_VAULT:-$(prev NOTES_VAULT)}"; vault="${vault:-$HOME/Documents/Not
 out="${NOTES_OUT:-$(prev NOTES_OUT)}";       out="${out:-$HOME/Documents/Notes Pages}"
 refs="${NOTES_REFS:-$(prev NOTES_REFS)}";    refs="${refs:-$HOME/.config/notes-clipper/renderer}"
 map="${NOTES_ROUTING_MAP:-$(prev NOTES_ROUTING_MAP)}"; map="${map:-Routing_map_note.md}"
+agent="${NOTES_AGENT:-$(prev NOTES_AGENT)}"; agent="${agent:-claude}"
+case "$agent" in claude|codex) ;; *) echo "✗ NOTES_AGENT=$agent: use claude or codex" >&2; exit 1;; esac
 model="${CLAUDE_MODEL-$(prev CLAUDE_MODEL)}"
+codex_model="${CODEX_MODEL-$(prev CODEX_MODEL)}"
 label="${WATCHER_LABEL:-$(prev WATCHER_LABEL)}"; label="${label:-$(running_label)}"; label="${label:-com.notes-clipper.watcher}"
 
 if [ ! -d "$vault/Handwritten/notes" ]; then
@@ -76,5 +81,5 @@ if [ ! -f "$refs/build_html.py" ]; then
   echo "• Set up the notes renderer in $refs" >&2
 fi
 
-printf 'NOTES_VAULT="%s"\nNOTES_OUT="%s"\nNOTES_REFS="%s"\nNOTES_ROUTING_MAP="%s"\nWATCHER_LABEL="%s"\nCLAUDE_MODEL="%s"\n' \
-  "$(q "$vault")" "$(q "$out")" "$(q "$refs")" "$(q "$map")" "$(q "$label")" "$(q "$model")"
+printf 'NOTES_VAULT="%s"\nNOTES_OUT="%s"\nNOTES_REFS="%s"\nNOTES_ROUTING_MAP="%s"\nWATCHER_LABEL="%s"\nNOTES_AGENT="%s"\nCLAUDE_MODEL="%s"\nCODEX_MODEL="%s"\n' \
+  "$(q "$vault")" "$(q "$out")" "$(q "$refs")" "$(q "$map")" "$(q "$label")" "$(q "$agent")" "$(q "$model")" "$(q "$codex_model")"

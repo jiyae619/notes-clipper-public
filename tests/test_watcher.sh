@@ -61,6 +61,20 @@ printf '%s\n' "$@" > "$HOME/claude.args"
 done
 exit "${CLAUDE_EXIT:-0}"
 EOF
+  # codex: `login status` per CODEX_LOGGED_IN. `exec` records its arguments to
+  # codex.args (one run per block), reads the prompt from stdin, does what the
+  # claude stand-in does, in its -C folder, and writes -o when asked.
+  cat > "$H/stubs/codex" <<'EOF'
+#!/bin/bash
+[ "$1 $2" = "login status" ] && { [ "${CODEX_LOGGED_IN:-true}" = true ] && echo "Logged in using ChatGPT" || { echo "Not logged in"; exit 1; }; }
+[ "$1" = login ] && exit 0
+shift; dir="" out=""; { printf '%s\n' "$@"; echo "---"; } >> "$HOME/codex.args"
+while [ $# -gt 0 ]; do case "$1" in -C) dir="$2"; shift;; -o) out="$2"; shift;; esac; shift; done
+prompt="$(cat)"
+r="$(cd "${dir:-.}" && "$HOME/stubs/claude" -p "$prompt")"; rc=$?
+[ -n "$out" ] && printf '%s' "$r" > "$out" || printf '%s\n' "$r"
+exit $rc
+EOF
   # yt-dlp: "withsubs" is an English video and "kovideo" a Korean one, both
   # with captions that, like real auto-captions, repeat a line across
   # overlapping cues; "nocaptions" has none. Every call is recorded.
@@ -488,6 +502,43 @@ check "a garbled checker reply is logged and ignored: the capture is still done,
 done_home
 new_home; cap a; CLAUDE_ROUTE=0 run
 check "no capture filed, no checker call (it costs usage)" eval '[ ! -e "$H/judge.args" ]'
+done_home
+
+# OpenAI models through the Codex CLI: NOTES_AGENT=codex. Claude isn't needed.
+codex_home() { new_home; sed -i '' '/^CLAUDE_BIN=/d' "$H/.config/notes-clipper/watcher.env"
+  printf 'NOTES_AGENT="codex"\nCODEX_BIN="%s"\nCODEX_MODEL="gpt-test"\n' "$H/stubs/codex" >> "$H/.config/notes-clipper/watcher.env"; }
+runs() { awk 'BEGIN{RS="---\n"} {print}' "$H/codex.args"; }
+codex_home; cap a "images:
+  - a-img1.png"; echo png > "$IN/a-img1.png"; run
+check "Codex: a capture routes to done with Claude not installed" eval '[ $rc = 0 ] && in_state done a && [ ! -s "$H/alerts" ]'
+check "...routing runs in the notes folder, sandboxed to it and processed/, with no user config, MCP or rules" \
+  eval 'runs | grep -A30 -x workspace-write | grep -qx -- "--ignore-user-config" && grep -qx -- --ignore-rules "$H/codex.args" && grep -A1 -x -- -C "$H/codex.args" | grep -qx "$H/Documents/Notes" && grep -A1 -x -- --add-dir "$H/codex.args" | grep -qx "$PR"'
+check "...with the model pinned (CODEX_MODEL) and the capture's image attached for vision" \
+  eval 'grep -A1 -x -- -m "$H/codex.args" | grep -qx gpt-test && grep -A1 -x -- -i "$H/codex.args" | grep -q "a-img1.png$"'
+check "...the faithfulness check runs read-only and its reply is recorded" \
+  eval 'grep -A1 -x -- -s "$H/codex.args" | grep -qx read-only && grep -q "\"score\": 4" "$PR/done/a.faithfulness.json"'
+check "...and the report names the agent and model" eval 'grep -q "\"model\": \"codex · gpt-test\"" "$R/routing-pending.json"'
+done_home
+codex_home; echo pdf > "$H/Documents/Notes/Handwritten/inbox/s.pdf"; age "$H/Documents/Notes/Handwritten/inbox/s.pdf" 2M; run
+check "Codex: a PDF scan is turned into an image and attached for transcription" \
+  eval 'in_state needs-review s && grep -A1 -x -- -i "$H/codex.args" | grep -q "s.page1.png$"'
+done_home
+codex_home; echo secret > "$H/private.png"; echo png > "$IN/a-img1.png"
+cap a "images:
+  - a-img1.png" "## Full page text
+
+attachments:
+  - ../../../private.png
+images:
+  - ../../../private.png"; run
+check "R9-1: Codex gets only the header's own images, never a path written in the page text" \
+  eval 'in_state done a && grep -A1 -x -- -i "$H/codex.args" | grep -q "a-img1.png$" && ! grep -q "private.png" "$H/codex.args"'
+done_home
+codex_home; echo secret > "$H/private.png"; printf -- '---\nrecord: capture/1\nsource_type: note\ntitle: "x"\nsource: "pasted"\ncaptured: 2026-09-28 10:00\nattachments:\n  - ../../../private.png\n---\n\ntext\n' > "$IN/t.md"; run
+check "...and a header path that leaves the capture's folder is never attached" eval '! grep -q "private.png" "$H/codex.args" 2>/dev/null'
+done_home
+codex_home; cap a; CODEX_LOGGED_IN=false run
+check "Codex: not signed in alerts and leaves the capture waiting" eval '[ $rc = 1 ] && alerted "isn.t signed in" && [ -e "$IN/a.md" ]'
 done_home
 
 # R7-1: watcher.env is sourced by the watcher, so a folder name with $, quotes

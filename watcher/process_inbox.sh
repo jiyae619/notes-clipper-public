@@ -74,10 +74,11 @@ previews="${NOTES_OUT:-$HOME/Documents/Notes Pages}"
 routing_map="${NOTES_ROUTING_MAP:-Routing_map_note.md}"   # the note that says which topic gets what
 export NOTES_VAULT="$vault" NOTES_OUT="$previews"   # read by the build scripts
 log="$processed/watcher.log"
-claude_bin="${CLIP_CLAUDE_BIN:-$CLAUDE_BIN}"
-# CLAUDE_MODEL pins the model for every Claude call here, so quality doesn't
-# shift when the account's default model changes. Unset: Claude's default.
-model_args=(); [ -n "${CLAUDE_MODEL:-}" ] && model_args=(--model "$CLAUDE_MODEL")
+# The model calls (routing, transcription, the faithfulness check) all go
+# through agent.sh: NOTES_AGENT picks Claude Code or the Codex CLI, and
+# CLAUDE_MODEL / CODEX_MODEL pins the model so quality doesn't shift when an
+# account's default changes.
+. "$here/agent.sh"
 alert_stamps="$HOME/Library/Caches/notes-clipper-watcher"
 
 # Nobody reads this log while things run unattended: from Sep 5 every poll failed
@@ -99,8 +100,8 @@ alert() {  # alert KEY MESSAGE
 
 mkdir -p "$processing" "$done_dir" "$failed" "$skipped" "$needs_review" "$review_dir"
 
-if [ -z "$claude_bin" ]; then
-  alert setup "The watcher isn't set up (no claude path in ~/.config/notes-clipper/watcher.env). Run watcher/install.sh."
+if [ -z "$agent_bin" ]; then
+  alert setup "The watcher isn't set up (no $AGENT path in ~/.config/notes-clipper/watcher.env). Run watcher/install.sh."
   exit 1
 fi
 # Settings from an older install name no folders; guessing would file captures
@@ -222,8 +223,8 @@ waiting=$(( ${#files[@]} + ${#scans[@]} + ${#corrections[@]} ))
 # a bad token fails the run, and verify.sh then sends the capture to failed/.
 # Skipped for ad-hoc CLIP_CLAUDE_BIN runs; tests/ configures a stand-in that
 # answers `auth`, so the suite still exercises this check.
-if [ -z "$CLIP_CLAUDE_BIN" ] && ! "$claude_bin" auth status 2>/dev/null | grep -q '"loggedIn": *true'; then
-  alert signin "Claude isn't signed in, so $waiting capture(s) are waiting. Set up the watcher's token (see README) or run claude auth login."
+if ! agent_signed_in; then
+  alert signin "$AGENT isn't signed in, so $waiting capture(s) are waiting. See the README's Setup (claude setup-token, or codex login)."
   exit 1
 fi
 
@@ -303,8 +304,8 @@ if [ ${#to_transcribe[@]} -gt 0 ]; then
 $(printf '%s\n' "${to_transcribe[@]}")
 
 $(cat "$here/transcribe-scan.md")"
-  ( cd "$processing" && "$claude_bin" -p "$tprompt" "${model_args[@]}" --restricted --strict-mcp-config --tools "Read,Write,Edit,Glob,Grep" \
-      --permission-mode acceptEdits --add-dir "$processed" ) >> "$log" 2>&1
+  imgs=(); while IFS= read -r i; do imgs+=("$i"); done < <(record_images "${to_transcribe[@]}")
+  agent_write "$processing" "$tprompt" "${imgs[@]}" >> "$log" 2>&1
   for md in "${to_transcribe[@]}"; do
     stem="$(basename "${md%.md}")"
     if grep -qxF "$pending_line" "$md" || transcript_empty "$md"; then
@@ -399,14 +400,12 @@ cd "$vault" || { echo "  ERROR: vault not found" >> "$log"; exit 1; }
 # The notes as they were before this run, so the faithfulness check (below)
 # sees exactly what the run added.
 snap="$processed/.notes-before"; rm -rf "$snap"; cp -R "$vault/Handwritten/notes" "$snap" 2>/dev/null
-# The run reads untrusted web text, so it gets the least it needs. --restricted
-# drops the tools that run commands or fetch URLs, ignores the user/project
-# settings files (and their broad allow rules), and confines file tools to the
-# vault and processed/. --strict-mcp-config loads no MCP servers, so there's no
-# mail, Slack or browser to act through. --tools names the file tools, and only
-# them. The quiz bank and build scripts are out of reach; see step (3).
-"$claude_bin" -p "$prompt" "${model_args[@]}" --restricted --strict-mcp-config --tools "Read,Write,Edit,Glob,Grep" \
-  --permission-mode acceptEdits --add-dir "$processed" >> "$log" 2>&1
+# The run reads untrusted web text, so it gets the least it needs: file access
+# confined to the vault and processed/, no web, no MCP connectors (mail, Slack,
+# browser). How each agent enforces that is in agent.sh. The quiz bank and
+# build scripts are out of reach; see step (3).
+imgs=(); while IFS= read -r i; do imgs+=("$i"); done < <(record_images "${route[@]}")
+agent_write "$vault" "$prompt" "${imgs[@]}" >> "$log" 2>&1
 rc=$?
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] done (exit $rc)" >> "$log"
 
@@ -443,10 +442,10 @@ $done_list
 
 What the topic notes gained in this run:
 $(python3 "$here/faithfulness.py" added "$snap" "$vault/Handwritten/notes")"
-  "$claude_bin" -p "$fprompt" "${model_args[@]}" --restricted --strict-mcp-config --tools "Read,Glob,Grep" 2>> "$log" \
+  agent_read "$vault" "$fprompt" 2>> "$log" \
     | python3 "$here/faithfulness.py" apply "$done_dir" $(printf '%s\n' "$done_list" | cut -f1) >> "$log" 2>&1
 fi
-rm -rf "$snap"
+rm -rf "$snap" "$processed/.agent-images"
 # Apply the quiz/keyword proposals of the captures that made it, then rebuild
 # the notes, quiz and map once. The hooks that normally rebuild on each edit
 # don't fire under --restricted.
@@ -460,7 +459,7 @@ if [ ${#done_props[@]} -gt 0 ]; then
 fi
 # One What's new entry per run: each capture's source, title and where it went
 # (or why not). build_html.py attaches this report to the run's entry.
-printf '%s' "$report" | ROUTE_MODEL="${CLAUDE_MODEL:-account default}" python3 "$here/route_report.py" "$skills_ref/routing-pending.json" >> "$log" 2>&1
+printf '%s' "$report" | ROUTE_MODEL="$agent_label" python3 "$here/route_report.py" "$skills_ref/routing-pending.json" >> "$log" 2>&1
 { python3 "$skills_ref/build_quiz.py" && python3 "$skills_ref/build_html.py"; } >> "$log" 2>&1 \
   || alert build "Rebuilding the notes HTML failed; see watcher.log."
 

@@ -22,7 +22,7 @@ The map and quiz start empty and grow with every capture.
 |---|---|---|
 | A Mac | The background watcher uses macOS's launchd, Keychain and folder permissions. On Windows or Linux only the Chrome extension works. | |
 | Google Chrome | The clipping side panel is a Chrome extension. | [google.com/chrome](https://www.google.com/chrome/) |
-| Claude Code, signed in to a Claude Pro or Max plan | Claude reads each capture and files it. It runs on **your** Claude account, so routing uses your plan's usage. | [claude.com/claude-code](https://claude.com/claude-code) |
+| **One** AI agent: Claude Code on a Claude Pro or Max plan (the default), **or** OpenAI's Codex CLI on a ChatGPT plan | The agent reads each capture and files it. It runs on **your** account, so filing uses your plan's usage, not API credits. See [Claude or OpenAI](#claude-or-openai). | [claude.com/claude-code](https://claude.com/claude-code) · `npm install -g @openai/codex` |
 | Xcode Command Line Tools | Builds the small launcher app macOS grants folder access to. | `xcode-select --install` |
 | Python 3 and pandoc | Build the notes pages. | `brew install python pandoc` ([Homebrew](https://brew.sh)) |
 | yt-dlp (optional) | Fetches YouTube captions for video captures. | `brew install yt-dlp` |
@@ -66,9 +66,10 @@ git clone https://github.com/jiyae619/notes-clipper-public.git notes-clipper
    `Downloads` folder and keep **Ask where to save each file** off. The
    extension saves captures into `~/Downloads/notes-inbox/`.
 
-**3. Give the watcher its own Claude sign-in.** The CLI's normal sign-in can
-lapse when you don't use it, so the watcher uses a long-lived token kept in your
-login Keychain. In Terminal:
+**3. Sign the watcher in.** With Codex, run `codex login` once and skip to
+step 4. With Claude, the CLI's normal sign-in can lapse when you don't use it,
+so the watcher uses a long-lived token kept in your login Keychain. In
+Terminal:
 
 ```bash
 claude setup-token
@@ -118,6 +119,45 @@ belongs.
 page**, then **Save to notes**. Within a few minutes your notes index opens in
 the browser. If it doesn't, see [Troubleshooting](#troubleshooting).
 
+## Claude or OpenAI
+
+Notes Clipper runs one AI agent for everything: filing, scan transcription and
+the faithfulness check. Choose it when you install:
+
+```bash
+bash <repo>/watcher/install.sh
+```
+
+```bash
+NOTES_AGENT=codex bash <repo>/watcher/install.sh
+```
+
+The first uses Claude Code (the default); the second uses OpenAI's Codex CLI,
+signed in with `codex login`. Either runs on your own plan's usage. To switch
+later, run `install.sh` again with the other `NOTES_AGENT`; to pin a model, add
+`CLAUDE_MODEL=…` or `CODEX_MODEL=…` the same way.
+
+**The two aren't equally isolated.** The filing agent reads web pages, which
+can contain instructions aimed at it, so it gets as little as possible:
+
+| | Claude Code | Codex CLI |
+|---|---|---|
+| Tools | Read, write and edit files only: no shell | A shell, inside the macOS sandbox |
+| Writing | Only your notes folder and the processed folder | Same, plus the system temp folders, enforced by the sandbox |
+| Reading | Only your notes folder and the processed folder | **Any file your account can read** |
+| Network, web search | None | None |
+| Your other connectors, settings, rules | Not loaded | Not loaded |
+
+So with Codex, a malicious page could in principle get the agent to copy a
+file from elsewhere on your Mac into your notes. It can't send it anywhere
+(no network), and nothing is deleted, but if your Mac holds secrets you'd
+rather not risk, use Claude. Codex also can't open images or PDFs on its own:
+Notes Clipper attaches them for it, and of a multi-page PDF scan only the
+first page.
+
+To compare the two on the same captures, see
+[Checking filing quality](#checking-filing-quality).
+
 ## Daily use
 
 **Capturing**, in the Chrome side panel:
@@ -152,8 +192,13 @@ from its top bar. The watcher opens the index after each run that filed
 something.
 
 **Filing right away:** a save is picked up within a minute or two. To run it
-now and get a report on each capture, type `/route-capture` in Claude Code.
-`install.sh` installs this command.
+now and get a report on each capture, type `/route-capture` in Claude Code
+(`install.sh` installs this command). Without Claude Code, start the watcher
+yourself and read the log:
+
+```bash
+launchctl kickstart "gui/$(id -u)/com.notes-clipper.watcher"; tail -f ~/Downloads/notes-inbox-processed/watcher.log
+```
 
 ## Settings
 
@@ -167,7 +212,8 @@ change one, pass it to `install.sh` once, as in step 4.
 | `NOTES_ROUTING_MAP` | The note in `Handwritten/notes/` listing your topics | `Routing_map_note.md` |
 | `NOTES_REFS` | The page builder and its data: quiz bank, map concepts, What's new history | `~/.config/notes-clipper/renderer` |
 | `CLAUDE_BIN` | The `claude` program the watcher runs | found through your shell |
-| `CLAUDE_MODEL` | The model every Claude call uses, e.g. `claude-opus-5-5`. Pin it so quality doesn't change when your account's default does | unset: Claude's default |
+| `NOTES_AGENT` | `claude` (Claude Code) or `codex` (OpenAI's Codex CLI) | `claude` |
+| `CLAUDE_MODEL` / `CODEX_MODEL` | The model the agent uses, e.g. `claude-opus-5-5`. Pin it so quality doesn't change when your account's default does | unset: the agent's default |
 | `WATCHER_LABEL` | The background job's name | `com.notes-clipper.watcher` |
 
 Fixed locations: new captures land in `~/Downloads/notes-inbox/`; processed ones
@@ -235,10 +281,11 @@ renderer/                           rebuilds the notes pages, map and quiz
 ```
 
 **What the background run may do.** It reads web pages, which can contain text
-written to manipulate an AI, so it gets only what filing needs: it can read and
-write files in your notes folder and the processed folder, and nothing else. No
-shell, no web access, none of your other Claude connectors (mail, chat, browser).
-It can't touch the quiz bank or the page builder: it writes quiz questions and
+written to manipulate an AI, so it gets only what filing needs: it can write
+only in your notes folder and the processed folder, with no web access and none
+of your other connectors (mail, chat, browser). With Claude it can't read
+anything else either and has no shell; Codex differs there (see
+[Claude or OpenAI](#claude-or-openai)). It can't touch the quiz bank or the page builder: it writes quiz questions and
 map concepts as proposals, and `watcher/merge_proposals.py` checks every field
 before applying them. Its instructions forbid deleting or overwriting anything
 already in your notes.
@@ -327,7 +374,9 @@ page with instructions hidden in it (filed as text, never followed), and
 keeping key facts. The run prints what passed, each capture's faithfulness
 score and any claims the checker questioned, saves the result under
 `~/.cache/notes-clipper/evals/`, and compares it with the previous run. Run it
-after changing the routing prompt, the model or the watcher. It spends real
+after changing the routing prompt, the model or the watcher, or to compare
+agents: `EVAL_AGENT=codex bash evals/run.sh` runs the same set with Codex
+without changing your settings. It spends real
 usage: one routing run and one faithfulness check for the set.
 
 Your own set: add captures you've filed, then write in `expected.json` the

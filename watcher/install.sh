@@ -31,23 +31,31 @@ mkdir -p "$inbox" "$processed" "$config_dir" "$HOME/Library/Logs" "$HOME/Library
 [ -d "$inbox/processed" ] && { mv "$inbox/processed"/* "$processed"/ 2>/dev/null || true; rmdir "$inbox/processed" 2>/dev/null || true; }
 [ -f "$inbox/watcher.log" ] && mv "$inbox/watcher.log" "$processed/watcher.log" 2>/dev/null || true
 
-# launchd can't see nvm, so record where your shell finds claude. Re-run this
-# after a Node upgrade moves it. CLAUDE_BIN=/path/to/claude overrides the lookup.
-claude_bin="${CLAUDE_BIN:-$(command -v claude || zsh -ic 'command -v claude' 2>/dev/null | tail -1)}"
-[ -x "$claude_bin" ] || { echo "✗ Can't find the claude CLI. Re-run with CLAUDE_BIN=/path/to/claude"; exit 1; }
 # The page build runs python3 and pandoc under launchd's PATH (watcher.env below).
 for tool in python3 pandoc; do
   PATH="/opt/homebrew/bin:/usr/local/bin:$PATH" command -v "$tool" >/dev/null \
     || { echo "✗ $tool not found. Install it first: brew install $tool"; exit 1; }
 done
 # Vault, rendered pages and build scripts; see setup_paths.sh for the settings.
-paths="$(bash "$here/setup_paths.sh")"
+paths="$(bash "$here/setup_paths.sh")" || exit 1
+agent="$(eval "$paths"; printf '%s' "$NOTES_AGENT")"
+# launchd can't see nvm, so record where your shell finds the agent's CLI.
+# Re-run this after a Node upgrade moves it. CLAUDE_BIN / CODEX_BIN override
+# the lookup.
+find_cli() { command -v "$1" || zsh -ic "command -v $1" 2>/dev/null | tail -1; }
+if [ "$agent" = codex ]; then
+  agent_bin="${CODEX_BIN:-$(find_cli codex)}"; bin_line="CODEX_BIN=\"$agent_bin\""
+  [ -x "$agent_bin" ] || { echo "✗ Can't find the codex CLI. Install it (npm i -g @openai/codex), or re-run with CODEX_BIN=/path/to/codex"; exit 1; }
+else
+  agent_bin="${CLAUDE_BIN:-$(find_cli claude)}"; bin_line="CLAUDE_BIN=\"$agent_bin\""
+  [ -x "$agent_bin" ] || { echo "✗ Can't find the claude CLI. Re-run with CLAUDE_BIN=/path/to/claude"; exit 1; }
+fi
 label="$(eval "$paths"; printf '%s' "$WATCHER_LABEL")"   # read the way the watcher will
 plist_dst="$HOME/Library/LaunchAgents/$label.plist"
 cat > "$config_dir/watcher.env" <<EOF
 # Written by watcher/install.sh on $(date '+%Y-%m-%d'). Re-run it to refresh.
-CLAUDE_BIN="$claude_bin"
-WATCHER_PATH="$(dirname "$claude_bin"):/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
+$bin_line
+WATCHER_PATH="$(dirname "$agent_bin"):/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
 $paths
 EOF
 
