@@ -42,7 +42,7 @@ for tool in python3 pandoc; do
 done
 # Vault, rendered pages and build scripts; see setup_paths.sh for the settings.
 paths="$(bash "$here/setup_paths.sh")"
-label="$(printf '%s\n' "$paths" | sed -n 's/^WATCHER_LABEL="\(.*\)"$/\1/p')"
+label="$(eval "$paths"; printf '%s' "$WATCHER_LABEL")"   # read the way the watcher will
 plist_dst="$HOME/Library/LaunchAgents/$label.plist"
 cat > "$config_dir/watcher.env" <<EOF
 # Written by watcher/install.sh on $(date '+%Y-%m-%d'). Re-run it to refresh.

@@ -32,7 +32,8 @@ q = lambda i, note: {"id": f"{note}-0{i}", "note": note, "topic": "T " + p, "src
                      "opts": ["A " + p, "B", "C", "D"], "a": 1, "explain": "E " + p, "level": "apply", "type": "scenario"}
 json.dump([q(1, evil), q(2, evil), q(3, "Plain"), q(4, "기초 개념"), q(5, "Quiz")], open(f"{r}/quiz-bank.json", "w"))
 json.dump(["context layer", "agent", p], open(f"{r}/glossary-extra.json", "w"))
-json.dump([{"title": p, "type": "web", "state": "done", "notes": [evil], "archive": "a.md", "link": "file:///x"},
+json.dump([{"title": p, "type": "web", "state": "done", "notes": [evil], "archive": "a.md", "link": "file:///x",
+            "model": "M " + p, "faith": {"score": 2, "unsupported": ["U " + p], "missing": ["N " + p]}},
            {"title": p, "type": "web", "state": "failed", "why": p, "link": "x"}], open(f"{r}/routing-pending.json", "w"))
 PY
 build() { PATH="/opt/homebrew/bin:/usr/local/bin:$PATH" python3 "$R/build_quiz.py" && PATH="/opt/homebrew/bin:/usr/local/bin:$PATH" python3 "$R/build_html.py"; } > "$T/out" 2>&1
@@ -76,6 +77,10 @@ const b=document.getElementById("q"); b.value="context"; b.dispatchEvent(new Eve
 for p in handwritten-notes-index.html $(cd "$NOTES_OUT" && ls handwritten-evil*.html handwritten-plain.html); do
   check "$p: What's new, search and ?q= highlighting run no planted code" eval '[ "$(drive "$p" "$USE" "?q=context")" = clean ]'
 done
+WN='document.getElementById("wn-fab").click(); const t=document.getElementById("wn-body").textContent;
+if (!/faithfulness 2\/5/.test(t) || !/not in the source/.test(t) || !/M <img/.test(t)) throw "What'"'"'s new lacks the check: "+t.slice(0,300);'
+check "What's new shows each capture's faithfulness, the claims not in its source and the model, as text" \
+  eval '[ "$(drive handwritten-notes-index.html "$WN")" = clean ]'
 check "the note keeps its content: the planted image stays, minus its handler" \
   eval 'grep -q "Heading <img src=\"x\"" "$NOTES_OUT"/handwritten-evil*.html && ! grep -qE "<img[^>]* onerror" "$NOTES_OUT"/handwritten-evil*.html'
 rm -rf "$T"

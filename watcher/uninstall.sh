@@ -3,7 +3,7 @@
 # Its name is WATCHER_LABEL in watcher.env (written by install.sh); an install
 # from before that setting is found by the job that runs this checkout's watcher.
 here="$(cd "$(dirname "$0")" && pwd)"
-label="$(sed -n 's/^WATCHER_LABEL="\(.*\)"$/\1/p' "$HOME/.config/notes-clipper/watcher.env" 2>/dev/null | tail -1)"
+label="$( . "$HOME/.config/notes-clipper/watcher.env" >/dev/null 2>&1; printf '%s' "${WATCHER_LABEL-}")"
 [ -n "$label" ] || label="$(grep -l "$here/process_inbox.sh" "$HOME/Library/LaunchAgents/"*.plist 2>/dev/null | head -1 \
   | xargs -I{} /usr/bin/plutil -extract Label raw {} 2>/dev/null)"
 label="${label:-com.notes-clipper.watcher}"

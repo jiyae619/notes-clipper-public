@@ -38,6 +38,15 @@ if printf '%s\n' "$@" | grep -q "^Transcribe these handwritten scans"; then
   done
   exit 0
 fi
+# Faithfulness check: record its arguments and answer for each capture listed,
+# with JUDGE_SCORE, or garbage when CLAUDE_JUDGE=bad.
+if printf '%s\n' "$@" | grep -q "^Check whether these summaries are faithful"; then
+  printf '%s\n' "$@" > "$HOME/judge.args"
+  [ "${CLAUDE_JUDGE:-}" = bad ] && { echo "I could not decide."; exit 0; }
+  printf '%s\n' "$@" | sed -n 's/^\([^\t]*\)\tHandwritten\/archive\/.*/\1/p' \
+    | awk -v s="${JUDGE_SCORE:-4}" 'BEGIN{printf "{"} {printf "%s\"%s\": {\"score\": %d, \"unsupported\": [\"a stretched claim\"], \"missing\": []}", (NR>1?",":""), $0, s} END{print "}"}'
+  exit 0
+fi
 printf '%s\n' "$@" > "$HOME/claude.args"
 # CLAUDE_DURING: a command run once, mid-routing, like a page saved during a run.
 [ -n "${CLAUDE_DURING:-}" ] && [ ! -e "$HOME/during.ran" ] && { touch "$HOME/during.ran"; eval "$CLAUDE_DURING"; }
@@ -448,6 +457,48 @@ new_home; mkdir -p "$H/Notes/Handwritten/notes" "$H/Notes/Handwritten/archive"
 echo "NOTES_VAULT=\"$H/Notes\"" >> "$H/.config/notes-clipper/watcher.env"; cap a; run
 check "the watcher routes into the vault named in watcher.env, and verifies it there" \
   eval 'in_state done a && [ -e "$H/Notes/Handwritten/archive/routed-a.md" ] && [ ! -e "$H/Documents/Notes/Handwritten/archive/routed-a.md" ]'
+done_home
+
+# The model is a setting: pinned, every Claude call uses it and the report says
+# which; unset, Claude's own default runs and the report says that.
+new_home; echo 'CLAUDE_MODEL="claude-test-model"' >> "$H/.config/notes-clipper/watcher.env"; cap a
+echo pdf > "$H/Documents/Notes/Handwritten/inbox/s.pdf"; age "$H/Documents/Notes/Handwritten/inbox/s.pdf" 2M; run
+check "a pinned model (CLAUDE_MODEL) is passed to routing and to transcription" \
+  eval 'grep -A1 -x -- --model "$H/claude.args" | grep -qx claude-test-model && grep -A1 -x -- --model "$H/transcribe.args" | grep -qx claude-test-model'
+check "...and each routed capture's report entry records the model" eval 'grep -q "\"model\": \"claude-test-model\"" "$R/routing-pending.json"'
+done_home
+new_home; cap a; run
+check "with no model set, no --model is passed and the report says the account default ran" \
+  eval '! grep -qx -- --model "$H/claude.args" && grep -q "\"model\": \"account default\"" "$R/routing-pending.json"'
+done_home
+
+# Faithfulness: one read-only Claude call per run checks what each capture
+# added against its verbatim source. Report only: it never changes an outcome.
+new_home; cap a; run
+check "a routed capture gets a faithfulness score, kept beside it and in its report entry" \
+  eval 'in_state done a && grep -q "\"score\": 4" "$PR/done/a.faithfulness.json" && grep -q "\"faith\"" "$R/routing-pending.json"'
+check "...the checker can only read: no Write, no Edit, no shell, no MCP" \
+  eval 'grep -qx "Read,Glob,Grep" "$H/judge.args" && grep -qx -- --restricted "$H/judge.args" && grep -qx -- --strict-mcp-config "$H/judge.args" && ! grep -qE "^(Read,Write|.*Edit)" "$H/judge.args"'
+check "...and is shown exactly what the run added, with the capture's archive file" \
+  eval 'grep -q "the context layer idea — verbatim: archive/routed-a.md" "$H/judge.args" && grep -q "^a	Handwritten/archive/routed-a.md" "$H/judge.args"'
+done_home
+new_home; cap a; CLAUDE_JUDGE=bad run
+check "a garbled checker reply is logged and ignored: the capture is still done, nothing alerts" \
+  eval '[ $rc = 0 ] && in_state done a && [ ! -e "$PR/done/a.faithfulness.json" ] && grep -q "reply wasn.t JSON" "$PR/watcher.log" && no_alerts'
+done_home
+new_home; cap a; CLAUDE_ROUTE=0 run
+check "no capture filed, no checker call (it costs usage)" eval '[ ! -e "$H/judge.args" ]'
+done_home
+
+# R7-1: watcher.env is sourced by the watcher, so a folder name with $, quotes
+# or backticks must come back exactly as given, never expanded or run.
+new_home; ODD="$H/My \$2026 \"notes\" \`x\`"; mkdir -p "$ODD/Handwritten/notes" "$ODD/Handwritten/archive"
+sed -i '' '/^NOTES_VAULT=/d' "$H/.config/notes-clipper/watcher.env"
+NOTES_VAULT="$ODD" setup > "$H/paths"; cat "$H/paths" >> "$H/.config/notes-clipper/watcher.env"; cap a; run
+check "R7-1: a notes folder named with \$, quotes and backticks is the folder the watcher files into" \
+  eval 'in_state done a && [ -e "$ODD/Handwritten/archive/routed-a.md" ]'
+NOTES_VAULT= setup > "$H/paths2"
+check "...and a re-install reads it back unchanged" eval 'diff -q "$H/paths" "$H/paths2" >/dev/null'
 done_home
 
 # The real build scripts, not stand-ins: what a new user sees after one capture.

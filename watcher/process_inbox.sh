@@ -75,6 +75,9 @@ routing_map="${NOTES_ROUTING_MAP:-Routing_map_note.md}"   # the note that says w
 export NOTES_VAULT="$vault" NOTES_OUT="$previews"   # read by the build scripts
 log="$processed/watcher.log"
 claude_bin="${CLIP_CLAUDE_BIN:-$CLAUDE_BIN}"
+# CLAUDE_MODEL pins the model for every Claude call here, so quality doesn't
+# shift when the account's default model changes. Unset: Claude's default.
+model_args=(); [ -n "${CLAUDE_MODEL:-}" ] && model_args=(--model "$CLAUDE_MODEL")
 alert_stamps="$HOME/Library/Caches/notes-clipper-watcher"
 
 # Nobody reads this log while things run unattended: from Sep 5 every poll failed
@@ -300,7 +303,7 @@ if [ ${#to_transcribe[@]} -gt 0 ]; then
 $(printf '%s\n' "${to_transcribe[@]}")
 
 $(cat "$here/transcribe-scan.md")"
-  ( cd "$processing" && "$claude_bin" -p "$tprompt" --restricted --strict-mcp-config --tools "Read,Write,Edit,Glob,Grep" \
+  ( cd "$processing" && "$claude_bin" -p "$tprompt" "${model_args[@]}" --restricted --strict-mcp-config --tools "Read,Write,Edit,Glob,Grep" \
       --permission-mode acceptEdits --add-dir "$processed" ) >> "$log" 2>&1
   for md in "${to_transcribe[@]}"; do
     stem="$(basename "${md%.md}")"
@@ -393,13 +396,16 @@ $file_list
 $(sed "s/{{ROUTING_MAP}}/$routing_map/g" "$here/route-capture.md")"
 
 cd "$vault" || { echo "  ERROR: vault not found" >> "$log"; exit 1; }
+# The notes as they were before this run, so the faithfulness check (below)
+# sees exactly what the run added.
+snap="$processed/.notes-before"; rm -rf "$snap"; cp -R "$vault/Handwritten/notes" "$snap" 2>/dev/null
 # The run reads untrusted web text, so it gets the least it needs. --restricted
 # drops the tools that run commands or fetch URLs, ignores the user/project
 # settings files (and their broad allow rules), and confines file tools to the
 # vault and processed/. --strict-mcp-config loads no MCP servers, so there's no
 # mail, Slack or browser to act through. --tools names the file tools, and only
 # them. The quiz bank and build scripts are out of reach; see step (3).
-"$claude_bin" -p "$prompt" --restricted --strict-mcp-config --tools "Read,Write,Edit,Glob,Grep" \
+"$claude_bin" -p "$prompt" "${model_args[@]}" --restricted --strict-mcp-config --tools "Read,Write,Edit,Glob,Grep" \
   --permission-mode acceptEdits --add-dir "$processed" >> "$log" 2>&1
 rc=$?
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] done (exit $rc)" >> "$log"
@@ -425,6 +431,22 @@ for md in "${route[@]}"; do
     [ "$n" -ge $max_attempts ] && gave_up=$((gave_up + 1))
   fi
 done
+# Faithfulness: one read-only Claude call checks what each filed capture added
+# to the notes against its verbatim archive file (check-faithfulness.md). It
+# reports a score per capture in What's new; it never changes an outcome.
+done_list="$(printf '%s' "$report" | awk -F'\t' '$1=="done"{n=$2; sub(/.*\//,"",n); sub(/\.md$/,"",n); split($3,a,","); print n "\tHandwritten/archive/" a[1]}')"
+if [ -n "$done_list" ] && [ -d "$snap" ]; then
+  fprompt="$(cat "$here/check-faithfulness.md")
+
+Captures (name, then its archive file):
+$done_list
+
+What the topic notes gained in this run:
+$(python3 "$here/faithfulness.py" added "$snap" "$vault/Handwritten/notes")"
+  "$claude_bin" -p "$fprompt" "${model_args[@]}" --restricted --strict-mcp-config --tools "Read,Glob,Grep" 2>> "$log" \
+    | python3 "$here/faithfulness.py" apply "$done_dir" $(printf '%s\n' "$done_list" | cut -f1) >> "$log" 2>&1
+fi
+rm -rf "$snap"
 # Apply the quiz/keyword proposals of the captures that made it, then rebuild
 # the notes, quiz and map once. The hooks that normally rebuild on each edit
 # don't fire under --restricted.
@@ -438,7 +460,7 @@ if [ ${#done_props[@]} -gt 0 ]; then
 fi
 # One What's new entry per run: each capture's source, title and where it went
 # (or why not). build_html.py attaches this report to the run's entry.
-printf '%s' "$report" | python3 "$here/route_report.py" "$skills_ref/routing-pending.json" >> "$log" 2>&1
+printf '%s' "$report" | ROUTE_MODEL="${CLAUDE_MODEL:-account default}" python3 "$here/route_report.py" "$skills_ref/routing-pending.json" >> "$log" 2>&1
 { python3 "$skills_ref/build_quiz.py" && python3 "$skills_ref/build_html.py"; } >> "$log" 2>&1 \
   || alert build "Rebuilding the notes HTML failed; see watcher.log."
 

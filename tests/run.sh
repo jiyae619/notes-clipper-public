@@ -15,6 +15,9 @@ echo
 echo "== in a real browser (needs Chrome and pandoc)"
 bash "$here/test_browser.sh" || rc=1
 echo
+echo "== eval scorer"
+bash "$here/test_evals.sh" || rc=1
+echo
 echo "== capture records"
 bash "$here/test_records.sh" || rc=1
 echo

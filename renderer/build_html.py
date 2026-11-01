@@ -46,7 +46,8 @@ esc = lambda s: html.escape(s or "", quote=True)
 PREF = []   # e.g. ["Routing_map_note.md"]; notes not listed follow alphabetically
 found = sorted(os.path.basename(p) for p in glob.glob(os.path.join(NOTES_DIR,"*.md")))
 NOTE_FILES = [f for f in PREF if f in found] + [f for f in found if f not in PREF]
-PAGES = pages.page_names(found)
+# Page names already given out live in pages.json beside the quiz bank (pages.py).
+PAGES = pages.page_names(found, os.path.dirname(os.path.abspath(__file__)), save=True)
 
 PALETTE = ["#3b5bdb","#0ca678","#e8590c","#ae3ec9","#1098ad","#d6336c","#5c7cfa","#2b8a3e"]
 WORD = {"ai":"AI","agi":"AGI","pm":"PM","ux":"UX","rag":"RAG","llm":"LLM","iam":"IAM"}
@@ -406,6 +407,11 @@ for i,fn in enumerate(NOTE_FILES):
                       secs=secs, kws=kws, kwtf=kwtf, nsrc=nsrc, color=PALETTE[i%len(PALETTE)],
                       idx=index_entries(body_html, slug_of(fn), label_of(fn))))
 
+# Not shown as topics: the routing map (a settings note, tagged routing-map),
+# and General until something is filed into it.
+notes = [n for n in notes if "routing-map" not in n["tags"]
+         and not ("general" in n["tags"] and not [s for s in n["secs"] if s != "Sources"])]
+
 # ---- "what's new" diff: compare this build to the previous one, roll a feed ----
 # Runs on every build (the PostToolUse hook rebuilds on any note edit), so new
 # notes / sections / quiz questions / map concepts are recorded automatically.
@@ -527,6 +533,10 @@ var KIND={web:'WEB',scan:'SCAN',screenshot:'SCREENSHOT',note:'LINK'};
 function route(c){var ok=c.state==='done';var t=ok?(KIND[c.type]||'CAPTURE'):'NOT ROUTED';
   var title=String(c.link||'').indexOf('file://')===0?'<a href="'+esc(c.link)+'">'+esc(c.title)+'</a>':esc(c.title);
   var dest=ok?' → '+esc((c.notes||[]).join(', ').replace(/_/g,' ')):' — '+esc(c.why);
+  // The faithfulness check (watcher/faithfulness.py) and the model that ran.
+  var f=c.faith; if(ok&&f&&typeof f.score==='number'){dest+=' · faithfulness '+esc(f.score)+'/5';
+    if((f.unsupported||[]).length)dest+=' · not in the source: '+f.unsupported.map(function(x){return '\u201c'+esc(x)+'\u201d';}).join('; ');}
+  if(c.model)dest+=' · '+esc(c.model);
   return '<li><span class="wn-tag '+(ok?'wn-cap':'wn-fail')+'">'+t+'</span>'+title+'<span class="dest">'+dest+'</span></li>';}
 function render(list){body.innerHTML=list.map(function(r){return '<div class="rec"><div class="rd">'+esc(r.date)+'</div><ul>'+(r.routes||[]).map(route).join('')+r.items.map(function(it){return '<li>'+tag(it)+esc(it)+'</li>';}).join('')+'</ul></div>';}).join('');}
 function show(list){render(list.slice().reverse());ov.style.display='flex';}
@@ -809,11 +819,11 @@ for n in notes:
 # ---- index hub ----
 cards="".join(
  f'<a class="cardlink" href="{esc(n["out"])}"><h3>{esc(n["title"])}</h3><p>{esc(" · ".join(n["secs"][:6]))}</p>'
- f'<div class="c">{n["nsrc"]} source scans · {len(n["secs"])} sections</div></a>' for n in notes)
+ f'<div class="c">{len(n["secs"])} sections' + (f' · {n["nsrc"]} scans' if n["nsrc"] else '') + '</div></a>' for n in notes)
 idx = f"""<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Notes</title>{FAV_NOTE}<style>{CSS}</style></head><body>
 <header class="bar"><a class="home" href="{INDEX}">📓 Notes</a>{SEARCH_BOX}</header>
 <div class="wrap"><h1>📓 Notes</h1>
-<p style="color:var(--mut);font-size:14px">Rendered from <code>Handwritten/notes/</code> · {len(notes)} notes · scan links inside open the original handwriting.</p>
+<p style="color:var(--mut);font-size:14px">{len(notes)} topic notes · each cites the saved original it came from.</p>
 <a class="bigbtn" href="{MAP}">🕸 Open keyword knowledge map</a>
 <a class="bigbtn" href="{QUIZ}" style="background:#0ca678;margin-left:8px">📝 Quiz yourself</a>
 <div class="grid">{cards}</div></div>{WN_SNIPPET}{SEARCH_JS}</body></html>"""
@@ -950,7 +960,7 @@ document.getElementById('zreset').onclick=()=>resetView();
 """
 
 mapdoc = ('<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
- '<title>Knowledge map — handwritten notes</title>'+FAV_MAP+'<style>'+CSS+
+ '<title>Knowledge map — notes</title>'+FAV_MAP+'<style>'+CSS+
  'html,body{height:100%}body{display:flex;flex-direction:column}#cv{flex:1;display:block;width:100%;background:radial-gradient(circle at 50% 40%,#fbfcfe,#eef1f5)}'
  '.maphead{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:8px 16px;border-bottom:1px solid var(--line);background:#fff}'
  '#mapq{flex:0 1 240px;padding:7px 11px;border:1px solid var(--line);border-radius:8px;font-size:14px}'

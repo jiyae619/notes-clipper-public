@@ -33,10 +33,15 @@ for line in sys.stdin:
     header = header or {}
     kind = header.get("source_type") or ("web" if header.get("type") == "web-capture" else "capture")
     entry = {"type": kind, "title": str(header.get("title") or os.path.basename(path)),
-             "state": state, "link": "file://" + os.path.abspath(path)}
+             "state": state, "link": "file://" + os.path.abspath(path),
+             "model": os.environ.get("ROUTE_MODEL", "account default")}
     if state == "done":
         archive, *notes = [x for x in detail.split(",") if x]
         entry.update(archive=archive, notes=notes)
+        try:   # the faithfulness check's result, if it ran (faithfulness.py)
+            entry["faith"] = json.load(open(path[:-3] + ".faithfulness.json", encoding="utf-8"))
+        except (OSError, ValueError):
+            pass
     else:
         entry["why"] = detail
     report.append(entry)

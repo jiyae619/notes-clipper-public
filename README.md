@@ -167,6 +167,8 @@ change one, pass it to `install.sh` once, as in step 4.
 | `NOTES_ROUTING_MAP` | The note in `Handwritten/notes/` listing your topics | `Routing_map_note.md` |
 | `NOTES_REFS` | The page builder and its data: quiz bank, map concepts, What's new history | `~/.config/notes-clipper/renderer` |
 | `CLAUDE_BIN` | The `claude` program the watcher runs | found through your shell |
+| `CLAUDE_MODEL` | The model every Claude call uses, e.g. `claude-opus-5-5`. Pin it so quality doesn't change when your account's default does | unset: Claude's default |
+| `WATCHER_LABEL` | The background job's name | `com.notes-clipper.watcher` |
 
 Fixed locations: new captures land in `~/Downloads/notes-inbox/`; processed ones
 and the log go to `~/Downloads/notes-inbox-processed/`.
@@ -246,6 +248,14 @@ was filed. `verify.sh` checks the notes folder: an archive file must name the
 capture and keep its source, its images must be in the archive, and a topic note
 must cite it. Anything less goes to `failed/` and is retried.
 
+**Is the summary true to the source?** After each run, one more Claude call
+reads each filed capture's verbatim archive and what the run added to the
+notes, and scores the summary 1 to 5: claims the source doesn't support, and
+key points left out. It can only read files. The score, the claims it
+questions and the model that ran appear next to the capture in What's new and
+in the log. It's a report, not a gate: nothing is blocked or changed, and it
+adds roughly one routing run's worth of usage.
+
 **Folder access.** launchd doesn't run the script directly. It starts **Notes
 Clipper Runner**, a small app `install.sh` builds from `watcher/runner/`,
 because macOS grants folder access per app. `install.sh` rebuilds it only when
@@ -299,6 +309,38 @@ the pages. The browser tests plant code in every field a capture can reach, then
 have headless Google Chrome play the quiz, open every map card, What's new and
 search, and fail if any of it runs. Without Chrome they report SKIPPED. The extension tests load the side
 panel's code in a sandbox and check the markdown it writes.
+
+## Checking filing quality
+
+The tests above use a stand-in for Claude. To see how well the real thing
+files, run a fixed set of captures through the real watcher, with your Claude
+and your `CLAUDE_MODEL`, in a throwaway home:
+
+```bash
+bash evals/run.sh
+```
+
+`evals/public/` holds six invented captures, each probing one behavior:
+filing into an existing note, starting a new topic note, one capture covering
+two topics, an off-topic capture going to General with a routing-check flag, a
+page with instructions hidden in it (filed as text, never followed), and
+keeping key facts. The run prints what passed, each capture's faithfulness
+score and any claims the checker questioned, saves the result under
+`~/.cache/notes-clipper/evals/`, and compares it with the previous run. Run it
+after changing the routing prompt, the model or the watcher. It spends real
+usage: one routing run and one faithfulness check for the set.
+
+Your own set: add captures you've filed, then write in `expected.json` the
+facts each must keep. It lives outside the repo, in
+`~/.config/notes-clipper/evals/my-set`, and runs the same way:
+
+```bash
+bash evals/add_capture.sh ~/Downloads/notes-inbox-processed/done/<capture>.md
+```
+
+```bash
+bash evals/run.sh ~/.config/notes-clipper/evals/my-set
+```
 
 ## Known limits
 

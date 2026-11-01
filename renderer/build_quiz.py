@@ -41,7 +41,7 @@ ARCHIVE = os.path.join(os.path.expanduser(os.environ.get("NOTES_VAULT", "~/Docum
 # The page each note's questions link to: the same rule build_html.py writes pages by.
 _NOTES_DIR = os.path.join(os.path.dirname(ARCHIVE), "notes")
 PAGES = {pages.stem_of(f): p for f, p in pages.page_names(
-    os.path.basename(x) for x in glob.glob(os.path.join(_NOTES_DIR, "*.md"))).items()}
+    [os.path.basename(x) for x in glob.glob(os.path.join(_NOTES_DIR, "*.md"))], HERE).items()}
 # Filenames of PDFs in archive/ that are published documents, not your scans,
 # shown under their own names. Keep in step with build_html.py.
 _OFFICIAL_DOCS = set()
@@ -144,7 +144,7 @@ function home(){
     .concat(NOTES.map(n=>'<option value="'+esc(n)+'">'+esc(nice(n))+' ('+c[n]+')</option>')).join('');
   app.innerHTML=`<div class="card">
     <h1>📝 Flashcard quiz</h1>
-    <p class="lead">Multiple choice from your handwritten &amp; note archive. 10 per round · instant feedback with the source · ⭐ save any question to review next time.</p>
+    <p class="lead">Multiple choice from your notes. 10 per round · instant feedback with the source · ⭐ save any question to review next time.</p>
     <div class="stat"><div><b>${BANK.length}</b>questions</div><div><b>${saved.size}</b>⭐ saved</div><div><b>${NOTES.length}</b>topics</div></div>
     <label class="fld" for="topic">Focus a topic</label>
     <select id="topic">${opts}</select>
@@ -272,11 +272,11 @@ home();
 
 doc = ('<!doctype html><html lang="en"><head><meta charset="utf-8">'
  '<meta name="viewport" content="width=device-width,initial-scale=1">'
- '<title>Flashcard quiz — handwritten notes</title><link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%20100%20100%22%3E%3Ctext%20y%3D%22.9em%22%20font-size%3D%2292%22%3E%F0%9F%93%9D%3C/text%3E%3C/svg%3E"><style>'+CSS+'</style></head><body>'
+ '<title>Flashcard quiz — notes</title><link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%20100%20100%22%3E%3Ctext%20y%3D%22.9em%22%20font-size%3D%2292%22%3E%F0%9F%93%9D%3C/text%3E%3C/svg%3E"><style>'+CSS+'</style></head><body>'
  '<header class="bar"><a class="home" href="handwritten-notes-index.html">📓 Notes</a>'
  '<a class="home" href="handwritten-knowledge-map.html" style="font-weight:500">🕸 Map</a>'
  '<span style="font-weight:700">📝 Quiz</span>'
- '<span class="sp">grounded in Handwritten/notes/</span></header>'
+ '<span class="sp">grounded in your notes</span></header>'
  '<div class="wrap"><div id="app"></div></div>'
  '<script>const BANK='+js_json(bank, ensure_ascii=False)+';const PAGES='+js_json(PAGES, ensure_ascii=False)+';'+APP+'</script></body></html>')
 

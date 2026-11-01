@@ -15,6 +15,8 @@
 #   NOTES_ROUTING_MAP  the note in Handwritten/notes/ that says which topic
 #                      gets what                  default Routing_map_note.md
 #   WATCHER_LABEL      the launchd job's name     default com.notes-clipper.watcher
+#   CLAUDE_MODEL       the model every Claude call uses, e.g. claude-opus-5-5
+#                                                 default: unset (Claude's own default)
 #
 # Upgrading an install from before these settings existed (a watcher.env with
 # no NOTES_VAULT): the folders it used can't be known from here, so this stops
@@ -30,7 +32,10 @@ here="$(cd "$(dirname "$0")" && pwd)"
 repo="$(cd "$here/.." && pwd)"
 env_file="$HOME/.config/notes-clipper/watcher.env"
 
-prev() { [ -f "$env_file" ] || return 0; sed -n "s/^$1=\"\(.*\)\"$/\1/p" "$env_file" | tail -1; }
+# watcher.env is a shell file the watcher sources, so it is read back the same
+# way (in a subshell), and every value is written escaped for double quotes.
+prev() { [ -f "$env_file" ] || return 0; ( . "$env_file" >/dev/null 2>&1; eval "printf '%s' \"\${$1-}\"" ); }
+q() { printf '%s' "$1" | sed 's/[\\"$`]/\\&/g'; }
 if [ -f "$env_file" ] && [ -z "$(prev NOTES_VAULT)" ] && [ -z "${NOTES_VAULT:-}" ]; then
   cat >&2 <<EOF
 ✗ This install was made by an older version, before the folders became settings.
@@ -51,6 +56,7 @@ vault="${NOTES_VAULT:-$(prev NOTES_VAULT)}"; vault="${vault:-$HOME/Documents/Not
 out="${NOTES_OUT:-$(prev NOTES_OUT)}";       out="${out:-$HOME/Documents/Notes Pages}"
 refs="${NOTES_REFS:-$(prev NOTES_REFS)}";    refs="${refs:-$HOME/.config/notes-clipper/renderer}"
 map="${NOTES_ROUTING_MAP:-$(prev NOTES_ROUTING_MAP)}"; map="${map:-Routing_map_note.md}"
+model="${CLAUDE_MODEL-$(prev CLAUDE_MODEL)}"
 label="${WATCHER_LABEL:-$(prev WATCHER_LABEL)}"; label="${label:-$(running_label)}"; label="${label:-com.notes-clipper.watcher}"
 
 if [ ! -d "$vault/Handwritten/notes" ]; then
@@ -70,5 +76,5 @@ if [ ! -f "$refs/build_html.py" ]; then
   echo "• Set up the notes renderer in $refs" >&2
 fi
 
-printf 'NOTES_VAULT="%s"\nNOTES_OUT="%s"\nNOTES_REFS="%s"\nNOTES_ROUTING_MAP="%s"\nWATCHER_LABEL="%s"\n' \
-  "$vault" "$out" "$refs" "$map" "$label"
+printf 'NOTES_VAULT="%s"\nNOTES_OUT="%s"\nNOTES_REFS="%s"\nNOTES_ROUTING_MAP="%s"\nWATCHER_LABEL="%s"\nCLAUDE_MODEL="%s"\n' \
+  "$(q "$vault")" "$(q "$out")" "$(q "$refs")" "$(q "$map")" "$(q "$label")" "$(q "$model")"

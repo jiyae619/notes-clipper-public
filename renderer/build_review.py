@@ -45,7 +45,7 @@ sections = "".join(f'<h2 id="sec-{esc(t)}">{esc(t)} <span class="n">({len(cards_
 nav = " ".join(f'<a href="#sec-{esc(t)}">{esc(t)} ({len(cards_by_topic[t])})</a>' for t in order)
 
 DOC = f'''<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Handwritten — review & edit</title><style>
+<title>Scanned pages — review & edit</title><style>
 :root{{--bg:#0f1115;--card:#1a1d24;--mut:#8b93a7;--acc:#7c9cff;--line:#2a2e38;--txt:#e6e9f0}}*{{box-sizing:border-box}}
 body{{margin:0;font:15px/1.5 -apple-system,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--txt)}}
 header{{position:sticky;top:0;z-index:10;background:#0f1115ee;backdrop-filter:blur(8px);border-bottom:1px solid var(--line);padding:12px 20px}}

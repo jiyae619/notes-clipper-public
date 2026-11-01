@@ -9,3 +9,6 @@ __pycache__/
 # Data the build scripts keep beside themselves when run from renderer/ directly.
 renderer/*.json
 
+
+# Page names given out to notes (renderer/pages.py).
+renderer/pages.json

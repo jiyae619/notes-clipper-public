@@ -91,6 +91,29 @@ check "...a note called Quiz doesn't overwrite the quiz page" eval 'grep -q "con
 check "...names in another script keep their letters" eval 'ls "$NOTES_OUT" | grep -q "기초"'
 check "...and every tab links to a page that exists" tabs_exist
 rm -f "$NOTES_VAULT/Handwritten/notes/"*_note.md
+# R7-2: a page keeps its address when a later note would have sorted ahead of it.
+mk() { printf -- '---\ntitle: "T %s"\n---\n# T %s\n\n## Part\n\nbody\n' "$1" "$1" > "$NOTES_VAULT/Handwritten/notes/$1_note.md"; }
+rm -f "$R/pages.json"   # a fresh setup: no page names given out yet
+mk "AI_PM"; build; mk "AI-PM"; build
+check "R7-2: an existing note keeps its page address when a colliding note is added" \
+  eval 'grep -q "<h1>T AI_PM</h1>" "$NOTES_OUT/handwritten-ai-pm.html" && grep -q "<h1>T AI-PM</h1>" "$NOTES_OUT/handwritten-ai-pm-2.html"'
+rm "$NOTES_VAULT/Handwritten/notes/AI_PM_note.md"; mk "AI PM"; build
+check "...and a deleted note's address isn't handed to a different note" \
+  eval '! grep -q "<h1>T AI PM</h1>" "$NOTES_OUT/handwritten-ai-pm.html" && grep -lq "<h1>T AI PM</h1>" "$NOTES_OUT"/handwritten-ai-pm-*.html'
+rm -f "$NOTES_VAULT/Handwritten/notes/"*_note.md
+# A new user's pages, built from the starter notes folder: no handwriting
+# wording on web clips, and the settings note isn't shown as a topic.
+rm -f "$NOTES_VAULT/Handwritten/notes/"*_note.md "$R/pages.json"
+cp "$here/../starter-vault/Handwritten/notes/"*.md "$NOTES_VAULT/Handwritten/notes/"
+mk "Cooking"; build; IDX="$NOTES_OUT/handwritten-notes-index.html"
+check "pages for web clips don't talk about handwriting or scans" \
+  eval '! grep -qiE "handwriting|source scans|handwritten notes|Handwritten/notes" "$IDX" "$NOTES_OUT/handwritten-quiz.html" "$NOTES_OUT/handwritten-knowledge-map.html" "$NOTES_OUT/handwritten-cooking.html"'
+check "the routing map is a settings note: not a tab, card, map node or search result" \
+  eval '! grep -q "Routing map" "$IDX" "$NOTES_OUT/handwritten-cooking.html" "$NOTES_OUT/handwritten-knowledge-map.html" "$NOTES_OUT/handwritten-search-index.js"'
+check "General stays hidden until something is filed into it" eval '! grep -q ">General<" "$IDX"'
+printf -- '\n## Odds and ends\n- a filed idea\n' >> "$NOTES_VAULT/Handwritten/notes/General_note.md"; build
+check "...and shows up once it has content" eval 'grep -q ">General<" "$IDX"'
+rm -f "$NOTES_VAULT/Handwritten/notes/"*.md
 check "diagrams render in Mermaid's strict mode (no script callbacks from diagram text)" \
   eval '! grep -q "securityLevel:.loose" "$here/../renderer/build_html.py" && grep -q "securityLevel:.strict" "$here/../renderer/build_html.py"'
 rm -rf "$T"
