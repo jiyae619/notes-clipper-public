@@ -878,6 +878,22 @@ HELP_SECTIONS = [
 <b>Save to notes</b>. Within a few minutes the capture is filed and these pages are rebuilt.</p>
 <p>The watcher that does the filing is installed once from Terminal; the README's Setup walks through it.</p>
 """),
+ ("scans", "Scan handwritten pages", """
+<p>Paper notes come in the same way: the AI transcribes each page word for word, and nothing is filed until
+you've checked the transcript.</p>
+<ol>
+<li>Scan the page with your phone (Files or Notes → <b>Scan Documents</b>). PDF, JPEG, PNG and HEIC all work.</li>
+<li>Put the file in <code>Handwritten/inbox/</code> inside your notes folder, by iCloud Drive, AirDrop or any
+other way. It's picked up within about 15 minutes.</li>
+<li>A review page opens with the scan beside its transcript. Words the AI wasn't sure of are listed above
+the text, marked <code>word[?]</code>, or <code>[illegible?]</code> where it couldn't read them; <b>Find</b>
+jumps to each one. Fix anything in the box.</li>
+<li>Click <b>Download corrections</b>. That download is your approval: the next run files the page into your
+topic notes and keeps the original scan alongside the transcript.</li>
+</ol>
+<p>Crossed-out text is never read as part of the note. With Codex as the agent, only the first page of a
+multi-page PDF is read, so scan pages separately or use Claude.</p>
+"""),
  ("model", "Choose or change the AI model", """
 <p>One AI agent does the filing, scan transcription and the faithfulness check. It runs on your own plan
 (Claude Pro or Max, or ChatGPT), not on API credits.</p>

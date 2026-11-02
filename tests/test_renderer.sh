@@ -119,8 +119,8 @@ rm -f "$NOTES_VAULT/Handwritten/notes/"*.md "$R/pages.json"; mk "Cooking"; mk "H
 H="$NOTES_OUT/handwritten-help.html"
 all_link_help() { for f in "$NOTES_OUT"/handwritten-*.html; do grep -q 'class="helpbtn"[^>]*href="handwritten-help.html"\|href="handwritten-help.html"[^>]*class="helpbtn"\|<a class="helpbtn" href="handwritten-help.html"' "$f" || return 1; done; }
 check "every page has the ? button linking the help page" all_link_help
-check "the help page covers the extension, the model, the map and the quiz" \
-  eval 'grep -q "id=\"install\"" "$H" && grep -q "id=\"model\"" "$H" && grep -q "id=\"map\"" "$H" && grep -q "id=\"quiz\"" "$H"'
+check "the help page covers the extension, scans, the model, the map and the quiz" \
+  eval 'grep -q "id=\"install\"" "$H" && grep -q "id=\"scans\"" "$H" && grep -q "id=\"model\"" "$H" && grep -q "id=\"map\"" "$H" && grep -q "id=\"quiz\"" "$H"'
 check "a note called Help gets its own page and can't overwrite the help page" \
   eval 'grep -q "How to use Notes-Clipper</h1>" "$H" && grep -lq "<h1>T Help</h1>" "$NOTES_OUT"/handwritten-help-*.html'
 check "pages carry the Notes-Clipper name and the note favicon, and no emoji in the chrome" \
