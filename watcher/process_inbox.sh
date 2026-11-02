@@ -95,7 +95,7 @@ alert() {  # alert KEY MESSAGE
   [ -n "$(find "$stamp" -mmin -360 2>/dev/null)" ] && return
   mkdir -p "$alert_stamps" && touch "$stamp"
   if [ -n "$CLIP_NOTIFY_BIN" ]; then "$CLIP_NOTIFY_BIN" "$2"
-  else osascript -e "display notification \"$2\" with title \"Notes Clipper\""; fi
+  else osascript -e "display notification \"$2\" with title \"Notes-Clipper\""; fi
 }
 
 mkdir -p "$processing" "$done_dir" "$failed" "$skipped" "$needs_review" "$review_dir"

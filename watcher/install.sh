@@ -69,7 +69,7 @@ if [ "$(cat "$app/Contents/Resources/source.sha256" 2>/dev/null)" != "$src_hash"
   clang -O2 -o "$runner" "$here/runner/main.c"
   echo "$src_hash" > "$app/Contents/Resources/source.sha256"
   codesign --force --sign - --identifier com.notes-clipper.runner "$app"
-  echo "• Built Notes Clipper Runner (a new build needs folder access granted again)"
+  echo "• Built Notes-Clipper Runner (a new build needs folder access granted again)"
 fi
 
 # /route-capture, the interactive way to run this watcher now. Linked rather
@@ -92,5 +92,5 @@ done
 launchctl bootout "gui/$(id -u)/$label" 2>/dev/null || true
 launchctl bootstrap "gui/$(id -u)" "$plist_dst"
 launchctl print "gui/$(id -u)/$label" >/dev/null 2>&1 \
-  && echo "✓ Watcher installed (runs when a capture lands, every 15 min, and once now). If macOS asks whether Notes Clipper Runner may access Downloads and Documents, click Allow. Then save a capture and check $processed/watcher.log" \
+  && echo "✓ Watcher installed (runs when a capture lands, every 15 min, and once now). If macOS asks whether Notes-Clipper Runner may access Downloads and Documents, click Allow. Then save a capture and check $processed/watcher.log" \
   || { echo "✗ Agent did not load — check: launchctl print gui/$(id -u)/$label"; exit 1; }

@@ -5,7 +5,7 @@
   <key>CFBundleIdentifier</key>
   <string>com.notes-clipper.runner</string>
   <key>CFBundleName</key>
-  <string>Notes Clipper Runner</string>
+  <string>Notes-Clipper Runner</string>
   <key>CFBundleExecutable</key>
   <string>notes-clipper-runner</string>
   <key>CFBundlePackageType</key>
@@ -15,8 +15,8 @@
   <key>LSUIElement</key>
   <true/>
   <key>NSDownloadsFolderUsageDescription</key>
-  <string>Notes Clipper reads captures that the Chrome extension saves to Downloads/notes-inbox.</string>
+  <string>Notes-Clipper reads captures that the Chrome extension saves to Downloads/notes-inbox.</string>
   <key>NSDocumentsFolderUsageDescription</key>
-  <string>Notes Clipper files your captures into your notes folder.</string>
+  <string>Notes-Clipper files your captures into your notes folder.</string>
 </dict>
 </plist>

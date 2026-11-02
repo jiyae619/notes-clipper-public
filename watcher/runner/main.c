@@ -1,4 +1,4 @@
-// Notes Clipper Runner — the program launchd starts for the watcher.
+// Notes-Clipper Runner — the program launchd starts for the watcher.
 //
 // macOS grants folder access (TCC: Downloads, Documents) per app, and judges a
 // child process by the app that launched it. Running process_inbox.sh through

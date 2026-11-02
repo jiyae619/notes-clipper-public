@@ -58,7 +58,7 @@ function askSiteAccess() {
   if (siteAllowed) return Promise.resolve(true);
   return chrome.permissions.request({ origins: ["<all_urls>"] }).then((ok) => (siteAllowed = ok), () => false);
 }
-const NO_SITE_ACCESS = "Notes Clipper isn’t allowed to read this site. Click again and choose Allow, or set Site access to “On all sites” in chrome://extensions → Notes Clipper → Details.";
+const NO_SITE_ACCESS = "Notes-Clipper isn’t allowed to read this site. Click again and choose Allow, or set Site access to “On all sites” in chrome://extensions → Notes-Clipper → Details.";
 
 async function refreshFromActiveTab() {
   const tab = await getActiveTab();

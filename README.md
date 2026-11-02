@@ -1,4 +1,4 @@
-# Notes Clipper
+# Notes-Clipper
 
 Save something worth keeping, such as a passage from an article, a YouTube video
 or a handwritten page, and a few minutes later it's filed into your notes by
@@ -16,6 +16,27 @@ with no server:
 
 The map and quiz start empty and grow with every capture.
 
+## What leaves your Mac
+
+Read this before installing:
+
+- **Everything you capture is sent to the AI provider you choose**, to be
+  filed: clipped text, whole pages, video captions, images and scanned
+  pages, plus the parts of your topic notes the agent reads to merge them.
+  That's Anthropic with Claude Code, or OpenAI with Codex, handled under
+  your provider's terms for your plan.
+- **Nothing goes anywhere else.** This project has no server and no
+  analytics. The extension makes no network requests of its own, and the
+  notes pages are local files that load nothing from the internet. The one
+  other connection is downloading a video's captions from YouTube, when you
+  save a video.
+- **Only what you add is captured.** The extension has access to every
+  site, so that you can clip from any of them, but it reads a page's content
+  only when you click to add from it. While its side panel is open it shows
+  the current tab's title and address; those stay on your Mac. Don't clip
+  what you wouldn't send to your provider: passwords, private messages,
+  other people's personal details.
+
 ## Requirements
 
 | What | Why | How to get it |
@@ -30,7 +51,7 @@ The map and quiz start empty and grow with every capture.
 
 Your notes are plain markdown files in a folder you choose. Any editor works.
 If you use a markdown app that keeps notes in a folder (Obsidian, for example),
-you can point Notes Clipper at that folder, but no such app is needed.
+you can point Notes-Clipper at that folder, but no such app is needed.
 
 ## What you fill in yourself
 
@@ -61,7 +82,7 @@ git clone https://github.com/jiyae619/notes-clipper-public.git notes-clipper
 
 1. Open `chrome://extensions` and switch on **Developer mode** (top right).
 2. Click **Load unpacked** and choose `<repo>/extension`.
-3. Pin **Notes Clipper** to the toolbar. Clicking it opens the side panel.
+3. Pin **Notes-Clipper** (the 📝 icon) to the toolbar. Clicking it opens the side panel.
 4. In `chrome://settings/downloads`, keep the download location as your
    `Downloads` folder and keep **Ask where to save each file** off. The
    extension saves captures into `~/Downloads/notes-inbox/`.
@@ -100,7 +121,7 @@ The first install creates a `Handwritten/` folder inside your notes folder (see
 [Your notes folder](#your-notes-folder)), sets up the page builder and starts the
 watcher. It never overwrites a file that already exists, so re-running it is safe.
 
-When macOS asks whether **Notes Clipper Runner** may access your Downloads and
+When macOS asks whether **Notes-Clipper Runner** may access your Downloads and
 Documents folders, click **Allow**. Without that, every run is blocked. If your
 notes folder is somewhere else, macOS asks about that folder instead.
 
@@ -121,7 +142,7 @@ the browser. If it doesn't, see [Troubleshooting](#troubleshooting).
 
 ## Claude or OpenAI
 
-Notes Clipper runs one AI agent for everything: filing, scan transcription and
+Notes-Clipper runs one AI agent for everything: filing, scan transcription and
 the faithfulness check. Choose it when you install:
 
 ```bash
@@ -152,7 +173,7 @@ So with Codex, a malicious page could in principle get the agent to copy a
 file from elsewhere on your Mac into your notes. It can't send it anywhere
 (no network), and nothing is deleted, but if your Mac holds secrets you'd
 rather not risk, use Claude. Codex also can't open images or PDFs on its own:
-Notes Clipper attaches them for it, and of a multi-page PDF scan only the
+Notes-Clipper attaches them for it, and of a multi-page PDF scan only the
 first page.
 
 To compare the two on the same captures, see
@@ -230,7 +251,7 @@ and the log go to `~/Downloads/notes-inbox-processed/`.
     notes/      your topic notes, plus Routing_map_note.md and General_note.md
 ```
 
-Everything Notes Clipper writes goes under `Handwritten/`, whatever the source.
+Everything Notes-Clipper writes goes under `Handwritten/`, whatever the source.
 The name comes from the project's first use (scanned paper notes). The rest of
 your folder is left alone.
 
@@ -248,7 +269,7 @@ tail -f ~/Downloads/notes-inbox-processed/watcher.log
 
 - **Nothing happens after saving.** Check that the capture is in
   `~/Downloads/notes-inbox/`. If not, check Chrome's download settings (step 2).
-- **macOS notification: "Can't read …"**. Notes Clipper Runner lacks folder
+- **macOS notification: "Can't read …"**. Notes-Clipper Runner lacks folder
   access. Open System Settings → Privacy & Security → Files and Folders, and
   allow it.
 - **"isn't set up" or a signed-out alert.** Re-run step 3, then `install.sh`.
@@ -315,7 +336,8 @@ its source changes, since a rebuild needs the access granted again.
 
 ## Files
 
-- `extension/`: the Chrome side panel (Manifest V3).
+- `extension/`: the Chrome side panel (Manifest V3). Its icon is the 📝 emoji from
+  Twemoji (CC-BY 4.0; see LICENSE).
 - `watcher/process_inbox.sh`: one run: claims captures, fetches video captions,
   runs Claude with the routing instructions, sorts each capture by what
   `verify.sh` finds, applies proposals, rebuilds the pages.

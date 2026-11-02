@@ -7,7 +7,7 @@ chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
 chrome.runtime.onInstalled.addListener(() => {
   chrome.contextMenus.create({
     id: "notes-clipper-add",
-    title: "Add selection to Notes Clipper",
+    title: "Add selection to Notes-Clipper",
     contexts: ["selection"],
   });
 });

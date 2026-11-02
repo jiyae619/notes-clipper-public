@@ -22,3 +22,7 @@ SOFTWARE.
 
 renderer/mermaid.min.js is Mermaid 11.17.2 (https://github.com/mermaid-js/mermaid),
 MIT License, copyright (c) Knut Sveidqvist.
+
+extension/icons/ are the 📝 (memo) emoji from Twemoji, created by Twitter and maintained
+by its contributors (https://github.com/jdecked/twemoji), rendered to PNG at four sizes.
+Twemoji graphics are licensed under CC-BY 4.0 (https://creativecommons.org/licenses/by/4.0/).

@@ -869,7 +869,7 @@ HELP_SECTIONS = [
 <ol>
 <li>Open <code>chrome://extensions</code> in Chrome and switch on <b>Developer mode</b> (top right).</li>
 <li>Click <b>Load unpacked</b> and choose the <code>extension</code> folder inside your Notes-Clipper download.</li>
-<li>Pin <b>Notes Clipper</b> to the toolbar. Clicking it opens the side panel.</li>
+<li>Pin <b>Notes-Clipper</b> (the memo icon) to the toolbar. Clicking it opens the side panel.</li>
 <li>In <code>chrome://settings/downloads</code>, keep the location as your Downloads folder and leave
 <b>Ask where to save each file</b> off.</li>
 </ol>
@@ -897,6 +897,10 @@ multi-page PDF is read, so scan pages separately or use Claude.</p>
  ("model", "Choose or change the AI model", """
 <p>One AI agent does the filing, scan transcription and the faithfulness check. It runs on your own plan
 (Claude Pro or Max, or ChatGPT), not on API credits.</p>
+<p><b>What leaves your Mac:</b> everything you capture (text, pages, images, scans) is sent to the provider
+you choose, Anthropic or OpenAI, to be filed, along with the parts of your notes the agent reads to merge it.
+Nothing goes anywhere else: Notes-Clipper has no server and no analytics, and these pages are local files.
+Don't clip what you wouldn't send to your provider.</p>
 <p>Choose the agent and pin a model by running the installer again with the setting you want. It remembers
 it from then on:</p>
 <pre><code>CLAUDE_MODEL=claude-opus-5-5 bash &lt;repo&gt;/watcher/install.sh</code></pre>

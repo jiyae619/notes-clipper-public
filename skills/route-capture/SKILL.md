@@ -1,11 +1,11 @@
 ---
 name: route-capture
-description: Route the captures waiting in the Notes Clipper inbox now, instead of waiting for the watcher (a fresh save already starts it; this is for the backlog, retries and scans), and report what happened to each. Runs the same watcher, with the same routing instructions, as the unattended poll. Trigger on "/route-capture", "route my captures", "route the inbox now", or "process the web inbox".
+description: Route the captures waiting in the Notes-Clipper inbox now, instead of waiting for the watcher (a fresh save already starts it; this is for the backlog, retries and scans), and report what happened to each. Runs the same watcher, with the same routing instructions, as the unattended poll. Trigger on "/route-capture", "route my captures", "route the inbox now", or "process the web inbox".
 ---
 
 # Route captures now
 
-Starts the Notes Clipper watcher immediately and reports the result. It never
+Starts the Notes-Clipper watcher immediately and reports the result. It never
 routes anything by hand: interactive and unattended routing must be the same
 code with the same instructions (`watcher/route-capture.md`), or they drift
 apart, as archive naming did on 2026-09-03.
@@ -24,7 +24,7 @@ named by `WATCHER_LABEL` in `~/.config/notes-clipper/watcher.env`
    this run.
 3. **Start the watcher** with
    `launchctl kickstart gui/$(id -u)/<label>`.
-   It runs under Notes Clipper Runner, which holds the macOS folder access. If
+   It runs under Notes-Clipper Runner, which holds the macOS folder access. If
    the agent isn't loaded, tell the user to run
    `bash <repo>/watcher/install.sh` and stop.
 4. **Wait for it to finish**: check

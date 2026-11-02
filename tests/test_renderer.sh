@@ -121,6 +121,7 @@ all_link_help() { for f in "$NOTES_OUT"/handwritten-*.html; do grep -q 'class="h
 check "every page has the ? button linking the help page" all_link_help
 check "the help page covers the extension, scans, the model, the map and the quiz" \
   eval 'grep -q "id=\"install\"" "$H" && grep -q "id=\"scans\"" "$H" && grep -q "id=\"model\"" "$H" && grep -q "id=\"map\"" "$H" && grep -q "id=\"quiz\"" "$H"'
+check "the help page says plainly what leaves the Mac and where it goes" eval 'grep -q "What leaves your Mac:" "$H" && grep -q "Anthropic or OpenAI" "$H"'
 check "a note called Help gets its own page and can't overwrite the help page" \
   eval 'grep -q "How to use Notes-Clipper</h1>" "$H" && grep -lq "<h1>T Help</h1>" "$NOTES_OUT"/handwritten-help-*.html'
 check "pages carry the Notes-Clipper name and the note favicon, and no emoji in the chrome" \
