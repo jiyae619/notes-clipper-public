@@ -5,7 +5,7 @@ Topic notes are created by the router from captured pages, so a filename is
 untrusted. A page name keeps letters and digits from any script, joined by
 dashes, and nothing else, so it is safe in a filename, a URL and HTML. Names
 that reduce to the same page, or to a page the build writes itself (quiz, map,
-index), get -2, -3...
+index, help), get -2, -3...
 
 A note keeps its page for good: names already given out are recorded in
 pages.json (beside the quiz bank) and never move to another note, even when a
@@ -15,7 +15,7 @@ pages already open stay right.
 import json, os, re
 
 PREFIX = "handwritten-"
-BUILT_IN = {"quiz", "knowledge-map", "notes-index", "search-index"}
+BUILT_IN = {"quiz", "knowledge-map", "notes-index", "search-index", "help"}
 
 
 def stem_of(fn):
@@ -29,7 +29,9 @@ def page_names(filenames, state_dir, save=False):
     path = os.path.join(state_dir, "pages.json")
     try:
         given = json.load(open(path, encoding="utf-8"))
-        given = {k: v for k, v in given.items() if isinstance(k, str) and isinstance(v, str)}
+        # A name the build now writes itself (a page added later, like help) is
+        # taken back: that note gets a new name rather than overwrite the page.
+        given = {k: v for k, v in given.items() if isinstance(k, str) and isinstance(v, str) and v not in BUILT_IN}
     except (OSError, ValueError, AttributeError):
         given = {}
     taken, out = set(BUILT_IN) | set(given.values()), {}

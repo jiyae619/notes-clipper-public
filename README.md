@@ -188,8 +188,9 @@ approve it.
 
 **Reading:** open `handwritten-notes-index.html` in your pages folder
 (`~/Documents/Notes Pages` unless you changed it). The map and quiz are linked
-from its top bar. The watcher opens the index after each run that filed
-something.
+from its top bar, and the **?** at the top right of every page opens a short guide:
+installing the extension, choosing the model, and how the map and quiz are
+made. The watcher opens the index after each run that filed something.
 
 **Filing right away:** a save is picked up within a minute or two. To run it
 now and get a report on each capture, type `/route-capture` in Claude Code

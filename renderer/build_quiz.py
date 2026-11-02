@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """Render quiz-bank.json into a self-contained MCQ flashcard app.
-10 questions/round, instant right/wrong + explanation w/ source, ⭐ save-to-review (localStorage).
+10 questions/round, instant right/wrong + explanation w/ source, save-to-review (localStorage).
 Output: $NOTES_OUT/handwritten-quiz.html . Re-run after editing quiz-bank.json."""
 import os, json, html, glob, sys
 sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
-import pages
+import pages, theme
 
 def js_json(obj, **kw):
     """JSON for embedding inside <script>: '<' is escaped, so text from a capture
@@ -61,62 +61,59 @@ bank = [dict(q, src=_label(q["src"]), explain=_label(q["explain"]),
 counts={}
 for q in bank: counts[q["note"]]=counts.get(q["note"],0)+1
 
-CSS = """
-:root{--bg:#f6f7f9;--card:#fff;--ink:#1f2430;--mut:#6b7280;--acc:#3b5bdb;--line:#e5e7eb;
---ok:#0ca678;--okbg:#ecfdf5;--okbd:#6ee7b7;--bad:#e03131;--badbg:#fff5f5;--badbd:#ffc9c9;--gold:#f59e0b}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased}
-a{color:var(--acc)}
-.bar{position:sticky;top:0;z-index:5;background:#ffffffee;backdrop-filter:blur(8px);border-bottom:1px solid var(--line);padding:10px 18px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-.bar .home{font-weight:700;text-decoration:none;color:var(--ink)}
-.bar .sp{margin-left:auto;font-size:13px;color:var(--mut)}
-.wrap{max-width:720px;margin:0 auto;padding:26px 20px 90px}
-.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:22px 22px;box-shadow:0 1px 2px rgba(0,0,0,.03)}
-h1{font-size:26px;letter-spacing:-.02em;margin:.1em 0 .3em}
-.lead{color:var(--mut);font-size:14.5px;margin:.2em 0 1.2em}
-label.fld{display:block;font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--mut);margin:0 0 5px}
-select{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:10px;font-size:15px;background:#fff}
-.btn{display:inline-block;border:0;background:var(--acc);color:#fff;font-weight:600;font-size:15px;padding:11px 18px;border-radius:11px;cursor:pointer;text-decoration:none}
-.btn:hover{filter:brightness(1.05)}.btn:disabled{background:#c3c9d4;cursor:not-allowed}
-.btn.ghost{background:#fff;color:var(--ink);border:1px solid var(--line)}
-.btn.ghost:hover{border-color:var(--acc);color:var(--acc)}
-.row{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}
-.stat{display:flex;gap:20px;margin:16px 0 4px;font-size:14px;color:var(--mut)}
-.stat b{color:var(--ink);font-size:19px;display:block}
-.prog{height:6px;background:#eef0f3;border-radius:6px;overflow:hidden;margin-bottom:16px}
-.prog>i{display:block;height:100%;background:var(--acc);transition:width .25s}
-.qmeta{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--mut);margin-bottom:6px}
-.chip{background:#eef1fb;color:var(--acc);border-radius:20px;padding:2px 10px;font-weight:600}
-.tag{font-size:11px;font-weight:700;border-radius:20px;padding:2px 9px}
-.tag.ty{background:#f1f5f9;color:#475569}
-.tag.lv-recall{background:#eef0f3;color:#6b7280}
-.tag.lv-apply{background:#e7f0ff;color:#1d4ed8}
-.tag.lv-analyze{background:#f3e8ff;color:#7e22ce}
-.q{font-size:19px;font-weight:600;line-height:1.4;margin:6px 0 16px}
-.opt{display:block;width:100%;text-align:left;background:#fff;border:1.5px solid var(--line);border-radius:12px;padding:13px 15px;margin:9px 0;font-size:15px;cursor:pointer;transition:.12s;position:relative}
-.opt:hover:not(:disabled){border-color:var(--acc);background:#f8f9ff}
+CSS = theme.BASE + """
+.wrap{max-width:var(--w-read);margin:0 auto;padding:var(--s-7) var(--gutter) var(--s-8)}
+.card{background:var(--surface);border-radius:var(--r-lg);box-shadow:var(--sh-1);padding:var(--s-6)}
+h1{font-size:var(--fs-7);line-height:1.15;margin:0 0 var(--s-2)}
+.lead{color:var(--mut);font-size:var(--fs-3);margin:0 0 var(--s-5)}
+.stat{display:grid;grid-template-columns:repeat(3,1fr);gap:var(--s-4);margin:0 0 var(--s-5);padding:var(--s-4) 0;
+  box-shadow:0 -1px 0 var(--line),0 1px 0 var(--line)}
+.stat div{font-size:var(--fs-2);color:var(--mut)}
+.stat b{display:block;font:600 var(--fs-6)/1.2 var(--font-read);color:var(--ink);font-variant-numeric:tabular-nums}
+label.fld{display:block;margin:var(--s-4) 0 var(--s-2)}
+select.field{width:100%;appearance:none;-webkit-appearance:none;padding-right:var(--s-6);
+  background:var(--surface) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23716d66' stroke-width='1.4'/%3E%3C/svg%3E") right 14px center/10px 6px no-repeat}
+.row{display:flex;gap:var(--s-3);flex-wrap:wrap;margin-top:var(--s-5)}
+.tip{color:var(--mut);font-size:var(--fs-2);margin:var(--s-5) 0 0}
+.prog{height:4px;background:var(--sunk);border-radius:999px;overflow:hidden;margin-bottom:var(--s-5)}
+.prog>i{display:block;height:100%;background:var(--accent);border-radius:999px;transition:width .25s var(--ease)}
+.qmeta{display:flex;align-items:center;flex-wrap:wrap;gap:var(--s-2);font-size:var(--fs-1);color:var(--mut);margin-bottom:var(--s-3)}
+.chip{font:600 var(--fs-1)/1 var(--font-ui);color:var(--accent);background:var(--accent-soft);border-radius:999px;padding:5px 10px}
+.qmeta .sp{margin-left:auto;font-variant-numeric:tabular-nums}
+.tag.lv-apply{color:var(--accent);background:var(--accent-soft)}
+.tag.lv-analyze{color:#7a3fa0;background:#f2eaf7}
+.q{font:600 var(--fs-5)/1.4 var(--font-read);margin:0 0 var(--s-4);text-wrap:pretty}
+.opt{display:flex;align-items:center;gap:var(--s-3);width:100%;min-height:52px;text-align:left;margin:0 0 var(--s-2);
+  padding:var(--s-3) var(--s-4);border:0;border-radius:var(--r-md);background:var(--surface);box-shadow:var(--sh-1);
+  font:var(--fs-3)/1.45 var(--font-ui);color:var(--ink);cursor:pointer;
+  transition:box-shadow .15s var(--ease),background-color .15s var(--ease),transform .1s var(--ease)}
+.opt:active:not(:disabled){transform:scale(.99)}
 .opt:disabled{cursor:default}
-.opt .k{display:inline-block;width:22px;height:22px;line-height:22px;text-align:center;border-radius:6px;background:#eef0f3;color:#6b7280;font-size:12px;font-weight:700;margin-right:10px}
-.opt.correct{border-color:var(--okbd);background:var(--okbg)}
-.opt.correct .k{background:var(--ok);color:#fff}
-.opt.wrong{border-color:var(--badbd);background:var(--badbg)}
-.opt.wrong .k{background:var(--bad);color:#fff}
-.opt .mark{position:absolute;right:14px;top:50%;transform:translateY(-50%);font-weight:700}
-.opt.correct .mark{color:var(--ok)}.opt.wrong .mark{color:var(--bad)}
-.exp{border-radius:12px;padding:13px 15px;margin-top:14px;font-size:14.5px;border:1px solid}
-.exp.ok{background:var(--okbg);border-color:var(--okbd)}
-.exp.bad{background:var(--badbg);border-color:var(--badbd)}
-.exp .verdict{font-weight:700;margin-bottom:4px}
+.opt .k{flex:none;width:24px;height:24px;display:grid;place-items:center;border-radius:var(--r-sm);background:var(--sunk);
+  color:var(--ink-2);font:600 var(--fs-1)/1 var(--font-ui)}
+.opt .mark{margin-left:auto;font-weight:600}
+@media (hover:hover){.opt:hover:not(:disabled){box-shadow:0 0 0 1.5px var(--accent)}}
+.opt.correct{background:var(--ok-soft);box-shadow:0 0 0 1.5px var(--ok)}
+.opt.correct .k{background:var(--ok);color:#fff}.opt.correct .mark{color:var(--ok)}
+.opt.wrong{background:var(--bad-soft);box-shadow:0 0 0 1.5px var(--bad)}
+.opt.wrong .k{background:var(--bad);color:#fff}.opt.wrong .mark{color:var(--bad)}
+.exp{border-radius:var(--r-md);padding:var(--s-4);margin-top:var(--s-4);font-size:var(--fs-3);line-height:1.55}
+.exp.ok{background:var(--ok-soft)}.exp.bad{background:var(--bad-soft)}
+.exp .verdict{font-weight:600;margin-bottom:var(--s-1)}
 .exp.ok .verdict{color:var(--ok)}.exp.bad .verdict{color:var(--bad)}
-.src{margin-top:10px;font-size:12.5px;color:var(--mut)}
-.src a{text-decoration:none;font-weight:600}
-.footer{display:flex;align-items:center;gap:10px;margin-top:16px}
-.savebtn{margin-left:auto;background:#fff;border:1px solid var(--line);border-radius:10px;padding:8px 12px;font-size:13px;cursor:pointer;color:var(--mut)}
-.savebtn.on{background:#fffbeb;border-color:var(--gold);color:#92600a}
-.missed{border-left:3px solid var(--badbd);padding:8px 12px;margin:10px 0;background:#fff;border-radius:0 8px 8px 0}
-.missed .m-q{font-weight:600;font-size:14.5px}
-.missed .m-a{font-size:13.5px;color:var(--ok);margin-top:3px}
-.big{font-size:40px;font-weight:800;letter-spacing:-.02em}
-kbd{background:#eef0f3;border:1px solid var(--line);border-radius:5px;padding:0 6px;font:12px ui-monospace,Menlo,monospace}
+.src{margin-top:var(--s-3);font-size:var(--fs-2);color:var(--mut)}
+.src a{font-weight:600;text-decoration:none}
+.footer{display:flex;align-items:center;gap:var(--s-3);margin-top:var(--s-5)}
+.savebtn{margin-left:auto;min-height:40px;padding:0 var(--s-4);border:0;border-radius:var(--r-md);background:var(--surface);
+  box-shadow:var(--sh-1);font:500 var(--fs-2)/1 var(--font-ui);color:var(--ink-2);cursor:pointer;transition:box-shadow .15s var(--ease)}
+.savebtn.on{color:var(--warn);background:var(--warn-soft);box-shadow:none}
+.missed .savebtn{min-height:32px;margin-left:var(--s-2)}
+.result{text-align:center;padding:var(--s-2) 0 var(--s-4)}
+.big{font:600 56px/1 var(--font-read);letter-spacing:-.02em;font-variant-numeric:tabular-nums;margin:var(--s-2) 0}
+.missed-h{font-size:var(--fs-5);margin:var(--s-5) 0 var(--s-3)}
+.missed{padding:var(--s-3) var(--s-4);margin:0 0 var(--s-2);background:var(--surface);border-radius:var(--r-md);box-shadow:inset 3px 0 0 var(--bad),var(--sh-1)}
+.missed .m-q{font-weight:600;font-size:var(--fs-3)}
+.missed .m-a{font-size:var(--fs-2);color:var(--ok);margin-top:var(--s-1)}
 """
 
 APP = r"""
@@ -143,19 +140,19 @@ function home(){
   const opts=['<option value="__all">All topics ('+BANK.length+')</option>']
     .concat(NOTES.map(n=>'<option value="'+esc(n)+'">'+esc(nice(n))+' ('+c[n]+')</option>')).join('');
   app.innerHTML=`<div class="card">
-    <h1>📝 Flashcard quiz</h1>
-    <p class="lead">Multiple choice from your notes. 10 per round · instant feedback with the source · ⭐ save any question to review next time.</p>
-    <div class="stat"><div><b>${BANK.length}</b>questions</div><div><b>${saved.size}</b>⭐ saved</div><div><b>${NOTES.length}</b>topics</div></div>
-    <label class="fld" for="topic">Focus a topic</label>
-    <select id="topic">${opts}</select>
-    <label class="fld" for="level" style="margin-top:12px">Difficulty</label>
-    <select id="level"><option value="__all">All levels</option><option value="recall">Recall — recognise a fact</option><option value="apply">Apply — use it in a scenario</option><option value="analyze">Analyze — diagnose / compare</option></select>
+    <h1>Quiz</h1>
+    <p class="lead">Multiple choice from your notes, ten per round. Each answer shows where it came from; save any question to see it again.</p>
+    <div class="stat"><div><b>${BANK.length}</b>questions</div><div><b>${saved.size}</b>saved</div><div><b>${NOTES.length}</b>topics</div></div>
+    <label class="fld eyebrow" for="topic">Topic</label>
+    <select id="topic" class="field">${opts}</select>
+    <label class="fld eyebrow" for="level">Difficulty</label>
+    <select id="level" class="field"><option value="__all">All levels</option><option value="recall">Recall — recognise a fact</option><option value="apply">Apply — use it in a scenario</option><option value="analyze">Analyze — diagnose / compare</option></select>
     <div class="row">
-      <button class="btn" id="start">Start round (10)</button>
-      <button class="btn ghost" id="review" ${saved.size?'':'disabled'}>Review saved (${saved.size})</button>
+      <button class="btn" id="start">Start a round</button>
+      <button class="btn quiet" id="review" ${saved.size?'':'disabled'}>Review saved (${saved.size})</button>
+      <button class="btn quiet" id="reset" ${saved.size?'':'disabled'}>Clear saved</button>
     </div>
-    <div class="row"><button class="btn ghost" id="reset" ${saved.size?'':'disabled'} style="font-size:13px;padding:7px 12px">Clear saved</button></div>
-    <p class="lead" style="margin-top:18px">Tip: press <kbd>1</kbd>–<kbd>4</kbd> to answer, <kbd>↵</kbd> for next.</p>
+    <p class="tip">Press <kbd>1</kbd>–<kbd>4</kbd> to answer and <kbd>↵</kbd> for the next question.</p>
   </div>`;
   document.getElementById('start').onclick=()=>{
     const t=document.getElementById('topic').value;
@@ -209,11 +206,11 @@ function answer(pos){
     <div class="exp ${correct?'ok':'bad'}">
       <div class="verdict">${correct?'✓ Correct':'✗ Not quite'}</div>
       <div>${esc(q.explain)}</div>
-      <div class="src">📄 <a href="${esc(slug(q.note))}">${esc(nice(q.note))}</a> · ${esc(q.topic)} · <b>source:</b> ${esc(q.src)}</div>
+      <div class="src"><a href="${esc(slug(q.note))}">${esc(nice(q.note))}</a> · ${esc(q.topic)} · <b>source:</b> ${esc(q.src)}</div>
     </div>
     <div class="footer">
       <button class="btn" id="next">${last?'See results':'Next →'}</button>
-      <button class="savebtn ${isSaved?'on':''}" id="save">${isSaved?'★ Saved':'☆ Save to review'}</button>
+      <button class="savebtn ${isSaved?'on':''}" id="save">${isSaved?'Saved for review':'Save for review'}</button>
     </div>`;
   document.getElementById('next').onclick=next;
   document.getElementById('save').onclick=()=>toggleSave(q.id);
@@ -223,7 +220,7 @@ function toggleSave(id){
   if(saved.has(id))saved.delete(id); else saved.add(id);
   setSaved(saved);
   const b=document.getElementById('save'); if(!b)return;
-  const on=saved.has(id); b.classList.toggle('on',on); b.textContent=on?'★ Saved':'☆ Save to review';
+  const on=saved.has(id); b.classList.toggle('on',on); b.textContent=on?'Saved for review':'Save for review';
 }
 
 function next(){ keyEnabled=false; S.idx++; if(S.idx<S.items.length) renderQ(); else end(); }
@@ -232,24 +229,23 @@ function end(){
   keyEnabled=false;
   const n=S.items.length, sc=S.score, pctv=Math.round(sc/n*100);
   const missed=S.items.filter(it=>it.chosen!==it.q.a);
-  const emoji=pctv>=80?'🏆':pctv>=50?'👍':'📚';
-  const missHTML=missed.length?('<h3 style="margin-top:22px;font-size:16px">Review these '+missed.length+'</h3>'+
+  const missHTML=missed.length?('<h3 class="missed-h">Review these '+missed.length+'</h3>'+
     missed.map(it=>`<div class="missed"><div class="m-q">${esc(it.q.q)}</div>
       <div class="m-a">✓ ${esc(it.q.opts[it.q.a])}</div>
-      <div class="src">📄 <a href="${esc(slug(it.q.note))}">${esc(nice(it.q.note))}</a> · source: ${esc(it.q.src)}
-      &nbsp;<button class="savebtn ${saved.has(it.q.id)?'on':''}" data-sv="${esc(it.q.id)}">${saved.has(it.q.id)?'★ Saved':'☆ Save'}</button></div></div>`).join(''))
-    :'<p class="lead" style="margin-top:18px">Clean sweep — nothing to review. 🎯</p>';
+      <div class="src"><a href="${esc(slug(it.q.note))}">${esc(nice(it.q.note))}</a> · source: ${esc(it.q.src)}
+      &nbsp;<button class="savebtn ${saved.has(it.q.id)?'on':''}" data-sv="${esc(it.q.id)}">${saved.has(it.q.id)?'Saved':'Save'}</button></div></div>`).join(''))
+    :'<p class="lead">Every answer right: nothing to review.</p>';
   app.innerHTML=`<div class="card">
-    <div style="text-align:center">
-      <div style="font-size:44px">${emoji}</div>
+    <div class="result">
+      <div class="eyebrow">${S.review?'Saved questions':'This round'}</div>
       <div class="big">${sc} / ${n}</div>
-      <p class="lead">${pctv}% this round${S.review?' · (saved-review mode)':''}</p>
+      <p class="lead">${pctv}% right</p>
     </div>
     ${missHTML}
-    <div class="row" style="margin-top:20px">
-      <button class="btn" id="again">New round (10)</button>
-      <button class="btn ghost" id="rev" ${saved.size?'':'disabled'}>Review saved (${saved.size})</button>
-      <button class="btn ghost" id="h">Home</button>
+    <div class="row">
+      <button class="btn" id="again">New round</button>
+      <button class="btn quiet" id="rev" ${saved.size?'':'disabled'}>Review saved (${saved.size})</button>
+      <button class="btn quiet" id="h">Home</button>
     </div>
   </div>`;
   [...document.querySelectorAll('[data-sv]')].forEach(b=>b.onclick=()=>{toggleSaveInline(b);});
@@ -258,7 +254,7 @@ function end(){
   document.getElementById('h').onclick=home;
 }
 function toggleSaveInline(b){const id=b.dataset.sv;if(saved.has(id))saved.delete(id);else saved.add(id);setSaved(saved);
-  const on=saved.has(id);b.classList.toggle('on',on);b.textContent=on?'★ Saved':'☆ Save';}
+  const on=saved.has(id);b.classList.toggle('on',on);b.textContent=on?'Saved':'Save';}
 
 document.addEventListener('keydown',e=>{
   if(!keyEnabled&&!(S&&S.items&&S.idx<S.items.length))return;
@@ -272,11 +268,9 @@ home();
 
 doc = ('<!doctype html><html lang="en"><head><meta charset="utf-8">'
  '<meta name="viewport" content="width=device-width,initial-scale=1">'
- '<title>Flashcard quiz — notes</title><link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%20100%20100%22%3E%3Ctext%20y%3D%22.9em%22%20font-size%3D%2292%22%3E%F0%9F%93%9D%3C/text%3E%3C/svg%3E"><style>'+CSS+'</style></head><body>'
- '<header class="bar"><a class="home" href="handwritten-notes-index.html">📓 Notes</a>'
- '<a class="home" href="handwritten-knowledge-map.html" style="font-weight:500">🕸 Map</a>'
- '<span style="font-weight:700">📝 Quiz</span>'
- '<span class="sp">grounded in your notes</span></header>'
+ '<title>Quiz — '+theme.NAME+'</title>'+theme.FAVICON+'<style>'+CSS+'</style></head><body>'
+ + theme.header("handwritten-notes-index.html", "", '<a class="tab" href="handwritten-knowledge-map.html">Map</a>'
+                '<a class="tab active" href="handwritten-quiz.html" aria-current="page">Quiz</a>') +
  '<div class="wrap"><div id="app"></div></div>'
  '<script>const BANK='+js_json(bank, ensure_ascii=False)+';const PAGES='+js_json(PAGES, ensure_ascii=False)+';'+APP+'</script></body></html>')
 

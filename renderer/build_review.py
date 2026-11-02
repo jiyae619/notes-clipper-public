@@ -7,6 +7,8 @@ Writes: <review>/review.html  → user edits, clicks Download corrections (handw
         then Claude applies each file's transcript back onto staging/<base>.md.
 Usage:  python3 build_review.py /path/to/Handwritten/_review"""
 import json, os, sys, html, urllib.parse
+sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
+import theme
 
 REVIEW = sys.argv[1] if len(sys.argv) > 1 else os.getcwd()
 STAGING = os.path.join(REVIEW, "staging")
@@ -27,16 +29,16 @@ for d in sorted(DATA, key=keyf):
     img = "assets/" + urllib.parse.quote(base) + ".jpg"
     if low:
         items = "".join(
-            f'<li><button class="jump" data-base="{esc(base)}" data-term="{esc(r["reads_as"])}">🔍</button>'
+            f'<li><button class="jump" data-base="{esc(base)}" data-term="{esc(r["reads_as"])}">Find</button>'
             f'<code>{esc(r["reads_as"])}</code> <span class="why why-{esc(r.get("why","ambiguous"))}">{esc(r.get("why",""))}</span>'
             f'<div class="ctx">{esc(r.get("context",""))}</div></li>' for r in low)
-        low_html = f'<div class="low"><div class="low-h">⚠️ {len(low)} low-confidence to verify</div><ul>{items}</ul></div>'
+        low_html = f'<div class="low"><div class="low-h">{len(low)} {"word" if len(low) == 1 else "words"} to check against the scan</div><ul>{items}</ul></div>'
     else:
-        low_html = '<div class="low ok">✓ no low-confidence flags</div>'
+        low_html = '<div class="low ok">Nothing flagged on this page</div>'
     card = f'''<div class="card"><div class="card-h"><span class="fn">{esc(base)}.pdf</span><span class="topic">{esc(topic)}</span></div>
   <div class="title">{esc(d.get("title",""))}</div><div class="cols">
     <div class="imgcol"><a href="{img}" target="_blank"><img loading="lazy" src="{img}" alt="{esc(base)}"></a></div>
-    <div class="txtcol">{low_html}<label>Transcript (edit anything — this is what gets saved):</label>
+    <div class="txtcol">{low_html}<label class="eyebrow" for="ta-{esc(base)}">Transcript — edit anything; this is what gets saved</label>
       <textarea id="ta-{esc(base)}" data-base="{esc(base)}" spellcheck="false">{esc(transcript)}</textarea></div></div></div>'''
     cards_by_topic.setdefault(topic, []).append(card)
 
@@ -45,29 +47,42 @@ sections = "".join(f'<h2 id="sec-{esc(t)}">{esc(t)} <span class="n">({len(cards_
 nav = " ".join(f'<a href="#sec-{esc(t)}">{esc(t)} ({len(cards_by_topic[t])})</a>' for t in order)
 
 DOC = f'''<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Scanned pages — review & edit</title><style>
-:root{{--bg:#0f1115;--card:#1a1d24;--mut:#8b93a7;--acc:#7c9cff;--line:#2a2e38;--txt:#e6e9f0}}*{{box-sizing:border-box}}
-body{{margin:0;font:15px/1.5 -apple-system,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--txt)}}
-header{{position:sticky;top:0;z-index:10;background:#0f1115ee;backdrop-filter:blur(8px);border-bottom:1px solid var(--line);padding:12px 20px}}
-header h1{{font-size:16px;margin:0 0 6px}}header .meta{{color:var(--mut);font-size:13px}}
-nav{{margin-top:8px;font-size:13px}}nav a{{color:var(--acc);text-decoration:none;margin-right:12px}}
-button.dl{{background:var(--acc);color:#0b1020;border:0;border-radius:8px;padding:8px 14px;font-weight:600;cursor:pointer;float:right}}
-main{{max-width:1100px;margin:0 auto;padding:20px}}h2{{margin:28px 0 12px;padding-bottom:6px;border-bottom:1px solid var(--line)}}h2 .n{{color:var(--mut);font-weight:400;font-size:14px}}
-.card{{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;margin:14px 0}}.card-h{{display:flex;justify-content:space-between;align-items:center}}
-.fn{{font-weight:600}}.topic{{color:var(--mut);font-size:12px;border:1px solid var(--line);border-radius:20px;padding:2px 10px}}.title{{color:var(--mut);font-size:13px;margin:4px 0 10px}}
-.cols{{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.2fr);gap:16px}}@media(max-width:820px){{.cols{{grid-template-columns:1fr}}}}
-.imgcol img{{width:100%;border-radius:8px;border:1px solid var(--line);background:#fff}}
-.low{{background:#221a13;border:1px solid #4a3a22;border-radius:8px;padding:8px 10px;margin-bottom:10px}}.low.ok{{background:#13241a;border-color:#244a32;color:#8fe0a8}}
-.low-h{{font-weight:600;font-size:13px;margin-bottom:4px}}.low ul{{margin:0;padding-left:0;list-style:none}}.low li{{margin:5px 0;font-size:13px}}
-.low code{{background:#0f1115;border:1px solid var(--line);border-radius:4px;padding:1px 5px;color:#ffd479}}.low .ctx{{color:var(--mut);font-size:12px;margin:2px 0 0 24px}}
-.why{{font-size:11px;border-radius:10px;padding:0 7px;margin-left:6px}}.why-illegible{{background:#5a2230;color:#ffb3c1}}.why-ambiguous{{background:#3a3320;color:#ffd479}}.why-cut-off{{background:#23314a;color:#9cc0ff}}.why-covered{{background:#3a234a;color:#d6a3ff}}
-button.jump{{background:none;border:0;cursor:pointer;font-size:13px;padding:0 4px 0 0}}label{{display:block;font-size:12px;color:var(--mut);margin:0 0 4px}}
-textarea{{width:100%;min-height:240px;background:#0f1115;color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:10px;font:13px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;resize:vertical}}
-.saved{{position:fixed;bottom:20px;right:20px;background:#13241a;border:1px solid #244a32;color:#8fe0a8;padding:10px 16px;border-radius:8px;display:none}}
+<title>Scanned pages — review</title>{theme.FAVICON}<style>{theme.BASE}
+.bar .grow{{flex:1}}
+main{{max-width:var(--w-page);margin:0 auto;padding:var(--s-6) var(--gutter) var(--s-8)}}
+.intro h1{{font-size:var(--fs-7);line-height:1.15;margin:0 0 var(--s-2)}}
+.intro p{{color:var(--mut);margin:0 0 var(--s-4);max-width:var(--w-read)}}
+.jumps{{display:flex;flex-wrap:wrap;gap:var(--s-2);margin:0 0 var(--s-5)}}
+.jumps a{{font:500 var(--fs-2)/1 var(--font-ui);color:var(--ink-2);text-decoration:none;background:var(--surface);box-shadow:var(--sh-1);border-radius:999px;padding:var(--s-2) var(--s-3)}}
+h2{{font-size:var(--fs-6);margin:var(--s-6) 0 var(--s-3)}}h2 .n{{color:var(--mut);font:400 var(--fs-3) var(--font-ui)}}
+.card{{background:var(--surface);border-radius:var(--r-lg);box-shadow:var(--sh-1);padding:var(--s-5);margin:0 0 var(--s-4)}}
+.card-h{{display:flex;justify-content:space-between;align-items:center;gap:var(--s-3)}}
+.fn{{font:600 var(--fs-3)/1.3 var(--font-ui)}}.title{{color:var(--mut);font-size:var(--fs-2);margin:var(--s-1) 0 var(--s-4)}}
+.cols{{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.2fr);gap:var(--s-5)}}
+.imgcol img{{display:block;width:100%;border-radius:var(--r-md);box-shadow:0 0 0 1px var(--line);background:#fff}}
+.low{{background:var(--warn-soft);color:var(--warn);border-radius:var(--r-md);padding:var(--s-3) var(--s-4);margin:0 0 var(--s-4)}}
+.low.ok{{background:var(--ok-soft);color:var(--ok)}}
+.low-h{{font-weight:600;font-size:var(--fs-2)}}.low ul{{margin:var(--s-2) 0 0;padding:0;list-style:none}}
+.low li{{margin:var(--s-2) 0;font-size:var(--fs-2);color:var(--ink)}}
+.low code{{font:var(--fs-2)/1.3 var(--font-mono);background:var(--surface);border-radius:4px;padding:1px 5px}}
+.low .ctx{{color:var(--mut);font-size:var(--fs-1);margin:var(--s-1) 0 0}}
+.why{{display:inline-block;font:600 10px/1.6 var(--font-ui);letter-spacing:.04em;border-radius:4px;padding:0 6px;margin-left:var(--s-1);background:var(--sunk);color:var(--ink-2)}}
+.why-illegible{{background:var(--bad-soft);color:var(--bad)}}
+button.jump{{min-height:28px;margin-right:var(--s-2);padding:0 var(--s-2);border:0;border-radius:var(--r-sm);background:var(--surface);box-shadow:var(--sh-1);
+  font:600 var(--fs-1)/1 var(--font-ui);color:var(--accent);cursor:pointer}}
+label.eyebrow{{display:block;margin:0 0 var(--s-2)}}
+textarea{{width:100%;min-height:260px;resize:vertical;border:0;border-radius:var(--r-md);box-shadow:var(--sh-1);background:var(--surface);
+  color:var(--ink);padding:var(--s-3);font:var(--fs-2)/1.6 var(--font-mono)}}
+textarea:focus{{outline:none;box-shadow:0 0 0 2px var(--accent)}}
+.saved{{position:fixed;right:var(--s-5);bottom:var(--s-5);display:none;background:var(--surface);color:var(--ok);box-shadow:var(--sh-2);
+  border-radius:999px;padding:var(--s-3) var(--s-4);font:600 var(--fs-2)/1 var(--font-ui)}}
+@media (max-width:860px){{.cols{{grid-template-columns:minmax(0,1fr)}}}}
 </style></head><body>
-<header><button class="dl" onclick="dl()">⬇ Download corrections</button><h1>Scanned pages — review & edit</h1>
-<div class="meta">{len(DATA)} pages · {total_low} low-confidence spans. Check each ⚠️ against the scan, fix it in the box, then <b>Download corrections</b> and tell Claude to "apply corrections".</div>
-<nav>{nav}</nav></header><main>{sections}</main><div class="saved" id="saved">✓ Saved to Downloads</div>
+<header class="bar"><div class="bar-in"><span class="home">Scanned pages</span><span class="grow"></span>
+<button class="btn" onclick="dl()">Download corrections</button></div></header>
+<main><div class="intro"><h1>Review the transcripts</h1>
+<p>{len(DATA)} {"page" if len(DATA) == 1 else "pages"} · {total_low} {"word" if total_low == 1 else "words"} the transcriber wasn't sure of. Check each against the scan, fix anything in the box, then download your corrections: the next run applies them and files the pages.</p>
+<nav class="jumps">{nav}</nav></div>{sections}</main><div class="saved" id="saved">Saved to Downloads</div>
 <script>
 document.querySelectorAll('button.jump').forEach(b=>b.onclick=()=>{{const ta=document.getElementById('ta-'+b.dataset.base);if(!ta)return;const i=ta.value.indexOf(b.dataset.term.split(' ')[0]);ta.focus();if(i>=0)ta.setSelectionRange(i,i+b.dataset.term.length);ta.scrollIntoView({{behavior:'smooth',block:'center'}});}});
 function dl(){{const files=[...document.querySelectorAll('textarea')].map(ta=>({{file:ta.dataset.base+'.pdf',base:ta.dataset.base,transcript:ta.value}}));const b=new Blob([JSON.stringify({{files}},null,2)],{{type:'application/json'}});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='handwritten-corrections.json';a.click();const s=document.getElementById('saved');s.style.display='block';setTimeout(()=>s.style.display='none',2500);}}
