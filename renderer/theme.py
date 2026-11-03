@@ -53,9 +53,9 @@ p,li{text-wrap:pretty}
 .bar{position:sticky;top:0;z-index:20;background:rgba(246,244,239,.86);
   backdrop-filter:saturate(140%) blur(12px);-webkit-backdrop-filter:saturate(140%) blur(12px);
   box-shadow:0 1px 0 var(--line)}
-.bar-in{max-width:var(--w-page);margin:0 auto;padding:0 var(--gutter);min-height:56px;
-  display:flex;align-items:center;gap:var(--s-1);flex-wrap:wrap}
-.home{font:600 var(--fs-5)/1 var(--font-read);color:var(--ink);text-decoration:none;
+.bar-in{max-width:1360px;margin:0 auto;padding:0 var(--gutter);min-height:56px;
+  display:flex;align-items:center;gap:var(--s-1)}
+.home{flex:none;font:600 var(--fs-5)/1 var(--font-read);color:var(--ink);text-decoration:none;
   margin-right:var(--s-4);letter-spacing:-.01em;padding:var(--s-2) 0}
 .tab{position:relative;font:500 var(--fs-2)/1 var(--font-ui);color:var(--mut);text-decoration:none;
   padding:var(--s-3) var(--s-2);white-space:nowrap;transition:color .15s var(--ease)}
@@ -64,9 +64,18 @@ p,li{text-wrap:pretty}
 .tab.active{color:var(--ink)}
 .tab.active::after{transform:scaleX(1)}
 .tabsep{width:1px;height:20px;background:var(--line-2);margin:0 var(--s-2) 0 auto}
+/* note tabs scroll inside their row, so Map, Quiz, search and ? never wrap */
+.bar-notes{flex:1 1 auto;min-width:0;display:flex;gap:var(--s-1);overflow-x:auto;scrollbar-width:none;
+  -webkit-mask-image:linear-gradient(90deg,#000 calc(100% - 24px),transparent);mask-image:linear-gradient(90deg,#000 calc(100% - 24px),transparent)}
+.bar-notes::-webkit-scrollbar{display:none}
+.bar-right{flex:none;display:flex;align-items:center;gap:var(--s-1);margin-left:auto}
+/* phones: name and links, then search, then the scrolling note tabs */
+@media (max-width:760px){.bar-in{flex-wrap:wrap;padding-bottom:var(--s-2)}.bar-right{display:contents}.tabsep{display:none}
+  .bar-right>a.tab:first-of-type{margin-left:auto}.bar-right>.searchwrap{order:2;flex-basis:100%;margin:0}
+  .bar-right>.searchwrap .searchbox,.bar-right>.searchwrap .searchbox:focus{width:100%}.bar-notes{order:3;flex-basis:100%}}
 @media (hover:hover){.tab:hover{color:var(--ink)}}
 
-.helpbtn{position:relative;flex:none;width:30px;height:30px;margin-left:var(--s-3);display:grid;place-items:center;border-radius:50%;
+.helpbtn{position:relative;flex:none;width:30px;height:30px;margin-left:var(--s-4);display:grid;place-items:center;border-radius:50%;
   background:var(--surface);box-shadow:var(--sh-1);color:var(--ink-2);font:600 var(--fs-3)/1 var(--font-read);text-decoration:none;
   transition:color .15s var(--ease),box-shadow .15s var(--ease)}
 .helpbtn::after{content:"";position:absolute;inset:-5px}
@@ -109,9 +118,9 @@ def header(brand_href, items_html="", right_html="", help_href=HELP):
     """The shared top bar: the name on the left, then `items_html` (note tabs),
     then a divider and `right_html` (Map, Quiz, search) pushed right, and the
     help button last, in the same corner on every page."""
+    notes = f'<div class="bar-notes">{items_html}</div>' if items_html else ""
     sep = '<span class="tabsep"></span>' if items_html and right_html else ""
-    push = "" if sep else '<span style="margin-left:auto"></span>'
     helpbtn = (f'<a class="helpbtn" href="{help_href}" title="How to use {NAME}" '
                f'aria-label="How to use {NAME}">?</a>') if help_href else ""
     return (f'<header class="bar"><nav class="bar-in"><a class="home" href="{brand_href}">{NAME}</a>'
-            f'{items_html}{sep}{push}{right_html}{helpbtn}</nav></header>')
+            f'{notes}<div class="bar-right">{sep}{right_html}{helpbtn}</div></nav></header>')

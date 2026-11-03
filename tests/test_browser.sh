@@ -69,8 +69,17 @@ drive handwritten-quiz.html "$LINKS" > /dev/null; links="$(sed -n 's/.*data-link
 check "quiz links to a note's page reach the page the build wrote (same page-name rule)" \
   all_exist $links
 
-MAP='for (let i=0; i<N.length; i++) card(i); if (!document.querySelector("#card h3")) throw "no card shown";'
-check "map: every node's card runs no planted code" eval '[ "$(drive handwritten-knowledge-map.html "$MAP")" = clean ]'
+MAP='for (let i=0; i<N.length; i++) { focusOn(i); card(i); } if (!document.querySelector("#card h3")) throw "no card shown";
+if (!document.querySelector("#trail [aria-current]")) throw "no path shown";'
+check "map: every node centred, its path and its card run no planted code" eval '[ "$(drive handwritten-knowledge-map.html "$MAP")" = clean ]'
+# A click on a note must open its panel, not jump away: the map is for seeing how
+# notes connect, and leaving the page on every click makes that impossible.
+NOTECLICK='const g=[...document.querySelectorAll("#cv g.node")].find(g=>+g.dataset.i!==focus&&N[+g.dataset.i].type==="note"), i=+g.dataset.i, here=location.pathname;
+g.dispatchEvent(new MouseEvent("click",{bubbles:true}));
+if (location.pathname!==here) throw "left the map"; if (focus!==i) throw "did not move to the middle";
+const o=document.querySelector("#card.on a.copen"); if (!o || o.getAttribute("href")!==N[i].url) throw "no panel with an Open note link";'
+check "map: clicking a note centres it and opens its panel with an Open note link, staying on the map" \
+  eval '[ "$(drive handwritten-knowledge-map.html "$NOTECLICK")" = clean ]'
 
 USE='document.getElementById("wn-fab").click(); if (!document.querySelector("#wn-body .rec")) throw "no What'"'"'s new";
 const b=document.getElementById("q"); b.value="context"; b.dispatchEvent(new Event("input")); b.value="Heading"; b.dispatchEvent(new Event("input"));'

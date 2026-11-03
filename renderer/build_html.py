@@ -150,7 +150,7 @@ details.sec[open] .takeaway{display:none}
 .secbody>*:first-child{margin-top:0}
 
 /* search */
-.searchwrap{position:relative;margin-left:var(--s-3)}
+.searchwrap{position:relative;flex:none;margin-left:var(--s-4)}
 .searchbox{width:188px;transition:width .2s var(--ease),box-shadow .15s var(--ease)}
 .searchbox:focus{width:260px}
 .qres{position:absolute;right:0;top:48px;width:min(440px,92vw);max-height:62vh;overflow:auto;background:var(--surface);
@@ -920,7 +920,9 @@ can't send them anywhere. The README compares the two.</p>
 <p>You don't build the map by hand: it is redrawn after every filing run, from your topic notes. Open it with
 <b>Map</b> in the header.</p>
 <ul>
-<li><b>Notes</b> are the colored circles. Click one to open it.</li>
+<li><b>One idea at a time.</b> The map puts one note or concept in the middle: the inner ring is what it is
+mostly about, the outer ring is where that leads. Click any circle to move it to the middle and see its panel;
+<b>Open note</b> in the panel takes you to the note, and the path above the map takes you back.</li>
 <li><b>Concepts</b> are the terms the map tracks. When a capture is filed, the AI proposes up to five specific
 terms from it. A term is added only if it appears in your notes, isn't on the map yet, and isn't in most
 notes at once (a word everywhere connects everything, so it shows nothing).</li>
@@ -1001,78 +1003,130 @@ for (a,b),sc in _pairs.items():
 GRAPH=js_json({"nodes":gnodes,"links":glinks})
 
 MAPJS = r"""
+// The map is a lens: one note or concept in the middle, what it is about on the
+// inner ring, and what that reaches on the outer ring. Clicking re-centres; the
+// panel holds the only link that leaves the page (Open note).
 const idx={}; GRAPH.nodes.forEach((n,i)=>idx[n.id]=i);
-const cv=document.getElementById('cv'), cx=cv.getContext('2d'); let W=0,H=0,DPR=1;
-function resize(){DPR=devicePixelRatio||1;W=cv.clientWidth;H=cv.clientHeight;cv.width=W*DPR;cv.height=H*DPR;cx.setTransform(DPR,0,0,DPR,0,0);}
-addEventListener('resize',resize); resize();
-const N=GRAPH.nodes.map(n=>({...n, x:W/2+(Math.random()*2-1)*Math.min(W,H)*0.38, y:H/2+(Math.random()*2-1)*Math.min(W,H)*0.38, vx:0,vy:0, a:1, r:n.r||(n.type==='note'?17:8)}));
-const L=GRAPH.links.map(l=>({s:idx[l.s],t:idx[l.t], w:l.w||1, kk:l.kk||0, a:0}));
+const N=GRAPH.nodes.map(n=>({...n}));
+const L=GRAPH.links.map(l=>({s:idx[l.s],t:idx[l.t], w:l.w||1, kk:l.kk||0}));
 const adj=N.map(()=>new Set()); L.forEach(l=>{adj[l.s].add(l.t);adj[l.t].add(l.s);});
-let hover=-1, sel=-1, drag=-1, moved=false, q='';
-let alpha=1; const ALPHA_MIN=0.005, ALPHA_DECAY=0.98; function reheat(a){alpha=Math.max(alpha,a);}
-let panX=0,panY=0,panning=false,px0=0,py0=0,panX0=0,panY0=0;
-let spread=1; const SPREAD_MIN=0.4, SPREAD_MAX=4;
-function zoomBy(f){spread=Math.min(SPREAD_MAX,Math.max(SPREAD_MIN,spread*f));reheat(0.6);}
-function resetView(){spread=1;panX=0;panY=0;reheat(0.6);}
-const VMAX=9;  // px/frame ceiling — stops nodes flinging when the sim reheats
-function step(){if(alpha<ALPHA_MIN)return;const kRep=2600*spread*spread,kSp=0.022,rest=72*spread,kG=0.016/spread,damp=0.82;
- for(let i=0;i<N.length;i++)for(let j=i+1;j<N.length;j++){let dx=N[i].x-N[j].x,dy=N[i].y-N[j].y,d2=dx*dx+dy*dy+.01,d=Math.sqrt(d2),
-   kk=(N[i].type==='note'&&N[j].type==='note')?kRep*14:kRep,f=kk/d2,fx=f*dx/d,fy=f*dy/d;N[i].vx+=fx;N[i].vy+=fy;N[j].vx-=fx;N[j].vy-=fy;}
- for(const l of L){let a=N[l.s],b=N[l.t],dx=b.x-a.x,dy=b.y-a.y,d=Math.sqrt(dx*dx+dy*dy)+.01,
-   st=(0.006+0.055*l.w)*spread,rl=(150-95*l.w)*spread,f=st*(d-rl),fx=f*dx/d,fy=f*dy/d;a.vx+=fx;a.vy+=fy;b.vx-=fx;b.vy-=fy;}
- for(let i=0;i<N.length;i++){let n=N[i];n.vx+=(W/2-n.x)*kG;n.vy+=(H/2-n.y)*kG;if(i===drag)continue;n.vx*=damp;n.vy*=damp;let dx=n.vx*alpha,dy=n.vy*alpha,m=Math.hypot(dx,dy);if(m>VMAX){dx=dx/m*VMAX;dy=dy/m*VMAX;}n.x+=dx;n.y+=dy;n.x=Math.max(n.r,Math.min(W-n.r,n.x));n.y=Math.max(n.r,Math.min(H-n.r,n.y));}
- alpha*=ALPHA_DECAY;}
-function draw(){cx.setTransform(DPR,0,0,DPR,0,0);cx.clearRect(0,0,W,H);cx.translate(panX,panY);const a=hover>=0?hover:sel;
- for(const l of L){const A=N[l.s],B=N[l.t],inc=a>=0&&(l.s===a||l.t===a);l.a+=((inc?1:0)-l.a)*0.16;
-  const base=a<0?(0.05+0.30*l.w):0.05, op=base+(0.55-base)*l.a;
-  cx.beginPath();cx.moveTo(A.x,A.y);cx.lineTo(B.x,B.y);
-  cx.strokeStyle=l.kk?'rgba(16,185,129,'+(op*0.9).toFixed(3)+')':((l.a>0.02?'rgba(47,79,179,':'rgba(150,143,130,')+op.toFixed(3)+')');
-  cx.lineWidth=0.4+2.4*l.w+0.7*l.a;cx.stroke();}
- const anyMatch=q&&N.some(n=>n.label.toLowerCase().includes(q));
- N.forEach((n,i)=>{const match=q&&n.label.toLowerCase().includes(q);
-  const dim=(a>=0&&i!==a&&!adj[a].has(i))||(anyMatch&&!match);
-  n.a+=((dim?0.14:1)-n.a)*0.16;
-  cx.globalAlpha=n.a;
-  if(match){cx.beginPath();cx.arc(n.x,n.y,n.r+7,0,7);cx.fillStyle='rgba(16,185,129,.22)';cx.fill();}
-  cx.beginPath();cx.arc(n.x,n.y,match?n.r+2:n.r,0,7);cx.fillStyle=match?'#10b981':(n.type==='note'?n.color:((n.df||1)>1?'#c98a1b':'#aba69c'));cx.fill();
-  if(match){cx.lineWidth=2;cx.strokeStyle='#047857';cx.stroke();}
-  if(i===hover||i===sel){cx.lineWidth=2.5;cx.strokeStyle='#111';cx.stroke();}
-  if(n.type==='note'||n.imp>0.13||i===hover||i===a||match){cx.globalAlpha=Math.max(0.3,n.a);cx.fillStyle='#1d1c1a';cx.font=(n.type==='note'?'600 14px Charter,"Iowan Old Style",Georgia,serif':'12px -apple-system,BlinkMacSystemFont,sans-serif');cx.textAlign='center';cx.fillText(n.label,n.x,n.y-n.r-5);}});
- cx.globalAlpha=1;}
-function loop(){step();draw();requestAnimationFrame(loop);} for(let i=0;i<220;i++)step(); alpha=0.12; loop();
-function pick(wx,wy){let b=-1,bd=1e9;N.forEach((n,i)=>{let d=Math.hypot(n.x-wx,n.y-wy);if(d<n.r+6&&d<bd){bd=d;b=i;}});return b;}
-function rel(e){const r=cv.getBoundingClientRect();return [e.clientX-r.left,e.clientY-r.top];}
-function toWorld(sx,sy){return [sx-panX,sy-panY];}
-cv.addEventListener('mousemove',e=>{const[sx,sy]=rel(e);if(panning){panX=panX0+(sx-px0);panY=panY0+(sy-py0);moved=true;cv.style.cursor='grabbing';return;}const[wx,wy]=toWorld(sx,sy);if(drag>=0){const d=N[drag];d.x+=(wx-d.x)*0.25;d.y+=(wy-d.y)*0.25;d.vx=0;d.vy=0;moved=true;cv.style.cursor='grabbing';return;}hover=pick(wx,wy);cv.style.cursor=hover>=0?'pointer':'grab';});
-cv.addEventListener('mousedown',e=>{const[sx,sy]=rel(e);const[wx,wy]=toWorld(sx,sy);drag=pick(wx,wy);moved=false;if(drag>=0){reheat(0.10);}else{panning=true;px0=sx;py0=sy;panX0=panX;panY0=panY;cv.style.cursor='grabbing';}});
-addEventListener('mouseup',()=>{if(drag>=0)reheat(0.05);drag=-1;panning=false;});
-cv.addEventListener('click',e=>{if(moved){moved=false;return;}const[sx,sy]=rel(e);const[wx,wy]=toWorld(sx,sy);const i=pick(wx,wy);if(i<0){sel=-1;card();return;}const n=N[i];if(n.type==='note')location.href=n.url;else{sel=i;card(i);}});
-cv.addEventListener('wheel',e=>{e.preventDefault();zoomBy(Math.exp(-e.deltaY*0.0015));},{passive:false});
-cv.addEventListener('dblclick',e=>{e.preventDefault();zoomBy(1.6);});
-addEventListener('keydown',e=>{if(e.target&&(e.target.id==='q'||e.target.id==='mapq'||e.target.tagName==='INPUT'))return;if(e.key==='0'){resetView();}else if(e.key==='+'||e.key==='='){zoomBy(1.3);}else if(e.key==='-'||e.key==='_'){zoomBy(1/1.3);}});
-function info(){document.getElementById('info').innerHTML='<span>Click a concept for its summary · click a note (colored) to open it · scroll / +\u2212 / double-click to spread out · drag background to pan · drag a node to move it · press 0 to reset.</span>';}
-info();
-const CARD=document.getElementById('card');
+const NOTES=N.map((n,i)=>i).filter(i=>N[i].type==='note');
+const wt=(a,b)=>{const l=L.find(l=>(l.s===a&&l.t===b)||(l.s===b&&l.t===a));return l?l.w:0;};
+const SV=document.getElementById('cv'), NS='http://www.w3.org/2000/svg';
+function el(t,a,p){const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);if(p)p.appendChild(e);return e;}
 function cesc(t){return String(t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
 // concepts link only to notes, so "appears with" = concepts sharing a note
 function coOccur(i){const cnt={};
   [...adj[i]].filter(j=>N[j].type==='note').forEach(j=>[...adj[j]].forEach(k=>{if(k!==i&&N[k].type!=='note')cnt[k]=(cnt[k]||0)+1;}));
   return Object.keys(cnt).map(k=>({i:+k,c:cnt[k]})).sort((a,b)=>b.c-a.c||N[a.i].label.localeCompare(N[b.i].label)).slice(0,12);}
-function card(i){
-  if(i==null||i<0){CARD.classList.remove('on');return;}
-  const n=N[i], ns=[...adj[i]].map(j=>N[j]).filter(m=>m.type==='note'), co=coOccur(i);
-  let h='<button class="cardx" title="Close">\u00d7</button>'
+const KCOL=i=>N[i].type==='note'?N[i].color:((N[i].df||1)>1?'#c98a1b':'#aba69c');
+
+// what surrounds a focus: ring1 = what it is about, ring2 = what that reaches, hop = ring1->ring2 links
+function rings(f,cap){const r1=[],r2=[],hop=[];
+  if(N[f].type==='note'){
+    L.filter(l=>!l.kk&&(l.s===f||l.t===f)).map(l=>({i:l.s===f?l.t:l.s,w:l.w})).sort((a,b)=>b.w-a.w).slice(0,cap).forEach(x=>r1.push(x));
+    const via={}; r1.forEach(c=>adj[c.i].forEach(j=>{if(j!==f&&N[j].type==='note'){(via[j]=via[j]||[]).push(c.i);}}));
+    Object.keys(via).forEach(j=>{r2.push({i:+j,w:via[j].length});via[j].forEach(c=>hop.push([c,+j]));});}
+  else{
+    [...adj[f]].filter(j=>N[j].type==='note').map(j=>({i:j,w:wt(f,j)})).sort((a,b)=>b.w-a.w).forEach(x=>r1.push(x));
+    let part=L.filter(l=>l.kk&&(l.s===f||l.t===f)).map(l=>({i:l.s===f?l.t:l.s,w:l.w}));
+    if(!part.length) part=coOccur(f).slice(0,10).map(o=>({i:o.i,w:Math.min(1,o.c/r1.length)}));
+    part.sort((a,b)=>b.w-a.w).slice(0,cap-4).forEach(x=>{r2.push(x);r1.forEach(n=>{if(adj[x.i].has(n.i))hop.push([n.i,x.i]);});});}
+  return {r1,r2,hop};}
+
+let focus=-1, trail=[], hopEls=[];
+// sized to fit beside the panel; the whole lens slides left only while the panel is open
+function draw(){const w=SV.clientWidth,h=SV.clientHeight,side=w>980?336:0,cx=w/2,cy=h/2+8;
+  // rings follow the screen's shape, leaving room for the outer labels
+  const X2=Math.max(80,Math.min((w-side)/2-70,(h-56)*0.62)),Y2=Math.max(80,h/2-44),X1=X2*0.55,Y1=Y2*0.55;
+  const {r1,r2,hop}=rings(focus,w<600?8:14), pos={[focus]:[cx,cy]};
+  r1.forEach((c,k)=>{const a=-Math.PI/2+k*2*Math.PI/r1.length;pos[c.i]=[cx+X1*Math.cos(a),cy+Y1*Math.sin(a)];});
+  // ring 2 sits near the angle of what it connects to, so its links stay short
+  r2.forEach(o=>{let x=0,y=0;hop.filter(p=>p[1]===o.i).forEach(p=>{x+=pos[p[0]][0]-cx;y+=pos[p[0]][1]-cy;});o.a=Math.atan2(y,x);});
+  r2.sort((a,b)=>a.a-b.a);
+  r2.forEach((o,k)=>{const a=r2.length>1?o.a*0.5+(-Math.PI+k*2*Math.PI/r2.length)*0.5:o.a;pos[o.i]=[cx+X2*Math.cos(a),cy+Y2*Math.sin(a)];});
+  SV.innerHTML='';const root=el('g',{id:'lensroot'},SV),E=el('g',{},root),D=el('g',{},root);hopEls=[];
+  SV.style.setProperty('--shift',-side/2+'px');slide();
+  const curve=(a,b,attrs)=>{const[x1,y1]=pos[a],[x2,y2]=pos[b],mx=(x1+x2)/2,my=(y1+y2)/2;
+    return el('path',Object.assign({d:`M${x1},${y1}Q${mx+(cy-my)*.12},${my+(mx-cx)*.12} ${x2},${y2}`,fill:'none',class:'edge'},attrs),E);};
+  r1.forEach(c=>curve(focus,c.i,{stroke:N[focus].type==='note'?N[focus].color:N[c.i].color,'stroke-width':1+4*Math.min(1,c.w),'stroke-opacity':.42}));
+  hop.forEach(([a,b])=>{if(pos[a]&&pos[b])hopEls.push([a,b,curve(a,b,{stroke:'#8b857b','stroke-width':1.2,'stroke-dasharray':'3 4','stroke-opacity':.07})]);});
+  const dot=(i,r,ring)=>{const n=N[i],[x,y]=pos[i],note=n.type==='note';
+    const g=el('g',{class:'node'+(i===focus?' focus':''),tabindex:0,role:'button','aria-label':(note?'Note: ':'Concept: ')+n.label},D);
+    g.style.transform=`translate(${cx}px,${cy}px)`;g.dataset.i=i;
+    el('circle',{r,fill:KCOL(i),stroke:'#fffdf9','stroke-width':note?3:1.5},g);
+    el('text',{y:-r-7,'text-anchor':'middle',class:note||i===focus?'nlab':'klab'},g).textContent=n.label;
+    g.getBoundingClientRect();g.style.transform=`translate(${x}px,${y}px)`;};
+  r2.forEach(o=>dot(o.i,N[o.i].type==='note'?11:5+4*Math.min(1,o.w),2));
+  r1.forEach(c=>dot(c.i,N[c.i].type==='note'?13:6+8*Math.min(1,c.w),1));
+  dot(focus,N[focus].type==='note'?24:16,0);
+  document.getElementById('ringkey').textContent=N[focus].type==='note'
+    ?'Inner ring: what this note is mostly about · outer ring: notes that share those ideas'
+    :'Inner ring: notes that use it · outer ring: ideas it travels with';}
+
+function drawTrail(){const T=document.getElementById('trail'), shown=trail.slice(-5), cut=trail.length>shown.length;
+  T.innerHTML=(cut?'<li class="more" aria-hidden="true">…</li>':'')+shown.map((i,k)=>k===shown.length-1
+    ?'<li><span aria-current="location">'+cesc(N[i].label)+'</span></li>'
+    :'<li><button data-i="'+i+'">'+cesc(N[i].label)+'</button></li>').join('');
+  T.querySelectorAll('button').forEach(b=>b.onclick=()=>focusOn(+b.dataset.i));
+  document.getElementById('lback').disabled=trail.length<2;}
+
+function focusOn(i,quiet){if(i==null||i<0||i>=N.length)return;
+  const at=trail.indexOf(i); trail=at>=0?trail.slice(0,at+1):[...trail,i].slice(-12);
+  focus=i; draw(); drawTrail();
+  try{history.replaceState(null,'','#'+encodeURIComponent(N[i].id));}catch(e){}
+  if(!quiet){sel=i;card(i);}}
+let sel=-1;
+SV.addEventListener('click',e=>{const g=e.target.closest('g.node');if(!g){sel=-1;card();return;}const i=+g.dataset.i;
+  if(i===focus){sel=i;card(i);}else focusOn(i);});
+SV.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){const g=e.target.closest('g.node');if(g){e.preventDefault();g.dispatchEvent(new MouseEvent('click',{bubbles:true}));}}});
+SV.addEventListener('mouseover',e=>{const g=e.target.closest('g.node'),i=g?+g.dataset.i:-1;
+  hopEls.forEach(([a,b,p])=>p.setAttribute('stroke-opacity',i>=0&&(a===i||b===i)?.7:.07));});
+document.getElementById('lback').onclick=()=>{if(trail.length>1)focusOn(trail[trail.length-2]);};
+let rt;addEventListener('resize',()=>{clearTimeout(rt);rt=setTimeout(draw,120);});
+
+const CARD=document.getElementById('card');
+// a note's neighbours are concepts; notes it shares concepts with are one hop further
+function noteCard(i){const n=N[i], ks=L.filter(l=>l.s===i||l.t===i).map(l=>({i:l.s===i?l.t:l.s,w:l.w})).sort((a,b)=>b.w-a.w);
+  const rel={}; ks.forEach(k=>adj[k.i].forEach(j=>{if(j!==i&&N[j].type==='note')rel[j]=(rel[j]||0)+1;}));
+  const rs=Object.keys(rel).map(j=>({i:+j,c:rel[j]})).sort((a,b)=>b.c-a.c);
+  let h='<button class="cardx" title="Close">×</button>'
+      +'<div class="ck"><span class="cdot" style="background:'+cesc(n.color)+'"></span>Note</div><h3>'+cesc(n.label)+'</h3>'
+      +'<div class="cmeta">'+ks.length+' concepts · shares ideas with '+rs.length+' other notes</div>'
+      +'<a class="btn copen" href="'+cesc(n.url)+'">Open note</a>';
+  if(ks.length) h+='<div class="csec">Mostly about</div>'
+      + ks.slice(0,12).map(k=>'<button class="chip" data-i="'+k.i+'">'+cesc(N[k.i].label)+'</button>').join('');
+  if(rs.length) h+='<div class="csec">Shares concepts with</div>'
+      + rs.map(r=>'<button class="cn" data-i="'+r.i+'"><span class="cdot" style="background:'+cesc(N[r.i].color)+'"></span>'+cesc(N[r.i].label)+'<span class="cc">'+r.c+'</span></button>').join('');
+  return h;}
+function conceptCard(i){const n=N[i], ns=[...adj[i]].filter(j=>N[j].type==='note').sort((a,b)=>wt(i,b)-wt(i,a)), co=coOccur(i);
+  let h='<button class="cardx" title="Close">×</button>'
       +'<div class="ck">Concept</div><h3>'+cesc(n.label)+'</h3>'
-      +'<div class="cmeta">appears in '+ns.length+' of '+N.filter(m=>m.type==='note').length+' notes</div>'
+      +'<div class="cmeta">appears in '+ns.length+' of '+NOTES.length+' notes</div>'
       +'<div class="csec">In these notes</div>'
-      + ns.map(m=>'<a class="cn" href="'+cesc(m.url)+'">'+cesc(m.label)+'</a>').join('');
+      + ns.map(j=>'<button class="cn" data-i="'+j+'"><span class="cdot" style="background:'+cesc(N[j].color)+'"></span>'+cesc(N[j].label)+'</button>').join('');
   if(co.length) h+='<div class="csec">Often appears with</div>'
-      + co.map(o=>'<button class="chip" data-i="'+o.i+'">'+cesc(N[o.i].label)+(o.c>1?' \u00b7 '+o.c:'')+'</button>').join('');
-  CARD.innerHTML=h; CARD.classList.add('on');
+      + co.map(o=>'<button class="chip" data-i="'+o.i+'">'+cesc(N[o.i].label)+(o.c>1?' · '+o.c:'')+'</button>').join('');
+  return h;}
+function slide(){const r=document.getElementById('lensroot');if(r)r.classList.toggle('aside',CARD.classList.contains('on'));}
+function card(i){
+  if(i==null||i<0){CARD.classList.remove('on');slide();return;}
+  CARD.innerHTML=N[i].type==='note'?noteCard(i):conceptCard(i); CARD.classList.add('on'); slide();
   CARD.querySelector('.cardx').onclick=()=>{sel=-1;card();};
-  CARD.querySelectorAll('.chip').forEach(b=>b.onclick=()=>{const j=+b.dataset.i;sel=j;card(j);});
+  CARD.querySelectorAll('[data-i]').forEach(b=>b.onclick=()=>focusOn(+b.dataset.i));
 }
-document.getElementById('mapq').addEventListener('input',e=>{q=e.target.value.trim().toLowerCase();reheat(0.02);});
+
+// find: any note or concept by name moves it to the middle
+const MQ=document.getElementById('mapq'), DL=document.getElementById('mapnames');
+DL.innerHTML=[...N.keys()].sort((a,b)=>(N[a].type==='note'?0:1)-(N[b].type==='note'?0:1)||N[a].label.localeCompare(N[b].label))
+  .map(i=>'<option value="'+cesc(N[i].label)+'">').join('');
+function find(){const q=MQ.value.trim().toLowerCase();if(!q)return;
+  let i=N.findIndex(n=>n.label.toLowerCase()===q);if(i<0)i=N.findIndex(n=>n.label.toLowerCase().includes(q));
+  MQ.classList.toggle('miss',i<0);if(i>=0){focusOn(i);MQ.blur();}}
+MQ.addEventListener('change',find);
+MQ.addEventListener('keydown',e=>{if(e.key==='Enter')find();});
+MQ.addEventListener('input',()=>MQ.classList.remove('miss'));
+
 const IB=document.getElementById('ib'),IP=document.getElementById('ip');
 function toggleInfo(on){IP.classList.toggle('on',on);IB.classList.toggle('on',on);}
 IB.onclick=e=>{e.stopPropagation();toggleInfo(!IP.classList.contains('on'));};
@@ -1080,26 +1134,47 @@ document.getElementById('ipx').onclick=()=>toggleInfo(false);
 IP.onclick=e=>e.stopPropagation();
 document.addEventListener('click',()=>toggleInfo(false));
 addEventListener('keydown',e=>{if(e.key==='Escape')toggleInfo(false);});
-document.getElementById('zin').onclick=()=>zoomBy(1.3);
-document.getElementById('zout').onclick=()=>zoomBy(1/1.3);
-document.getElementById('zreset').onclick=()=>resetView();
+
+const start=idx[decodeURIComponent(location.hash.slice(1))];
+if(NOTES.length) focusOn(start!=null?start:NOTES[0],true);
 """
 
 mapdoc = ('<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
  '<title>Knowledge map — '+theme.NAME+'</title>'+theme.FAVICON+'<style>'+CSS+
  'html,body{height:100%}body{display:flex;flex-direction:column}'
- '#cv{flex:1;display:block;width:100%}'
- '.maphead{max-width:var(--w-page);width:100%;margin:0 auto;padding:var(--s-4) var(--gutter);display:flex;gap:var(--s-3);align-items:center;flex-wrap:wrap}'
+ '#cv{flex:1;display:block;width:100%;height:100%;user-select:none}'
+ '#cv g.node{cursor:pointer;transition:transform .55s var(--ease)}'
+ '#lensroot{transition:transform .35s var(--ease)}#lensroot.aside{transform:translateX(var(--shift))}'
+ '#cv g.node:focus{outline:none}#cv g.node:focus-visible circle{stroke:var(--accent);stroke-width:3}'
+ '#cv .edge{transition:stroke-opacity .2s var(--ease);animation:fadein .5s var(--ease)}'
+ '@keyframes fadein{from{opacity:0}}'
+ '#cv .nlab{font:600 14px var(--font-read);fill:var(--ink);paint-order:stroke;stroke:var(--paper);stroke-width:4px;stroke-linejoin:round;pointer-events:none}'
+ '#cv .klab{font:12px var(--font-ui);fill:var(--ink-2);paint-order:stroke;stroke:var(--paper);stroke-width:3px;stroke-linejoin:round;pointer-events:none}'
+ '#cv g.focus .nlab{font-size:17px}'
+ '@media (hover:hover){#cv g.node:hover circle{stroke:var(--ink);stroke-width:2}}'
+ '.maphead{max-width:var(--w-page);width:100%;margin:0 auto;padding:var(--s-4) var(--gutter) var(--s-2);display:flex;gap:var(--s-3);align-items:center;flex-wrap:wrap}'
  '.maphead h1{margin:0 var(--s-2) 0 0;font-size:var(--fs-5)}'
- '#mapq{flex:0 1 240px}'
- '.ibtn,.zoom button{width:40px;height:40px;border:0;border-radius:var(--r-md);background:var(--surface);box-shadow:var(--sh-1);color:var(--ink-2);'
+ '#mapq{flex:0 1 260px}#mapq.miss{box-shadow:0 0 0 2px var(--bad)}'
+ '.ibtn,.lback{width:40px;height:40px;border:0;border-radius:var(--r-md);background:var(--surface);box-shadow:var(--sh-1);color:var(--ink-2);'
  'font:600 var(--fs-3)/1 var(--font-ui);cursor:pointer;flex:none;transition:color .15s var(--ease),box-shadow .15s var(--ease)}'
  '.ibtn{font-family:var(--font-read);font-style:italic}'
  '.ibtn.on{color:var(--accent);box-shadow:0 0 0 2px var(--accent)}'
- '@media (hover:hover){.ibtn:hover,.zoom button:hover{color:var(--accent);box-shadow:var(--sh-2)}}'
- '.zoom{display:flex;gap:var(--s-1)}'
+ '@media (hover:hover){.ibtn:hover,.lback:hover:not(:disabled){color:var(--accent);box-shadow:var(--sh-2)}}'
  '.legend{display:flex;align-items:center;gap:var(--s-3);font-size:var(--fs-1);color:var(--mut);margin-left:auto}'
  '.legend .dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px;vertical-align:0}'
+ # the path you took: reads as a location line, not as filters
+ '.lensbar{max-width:var(--w-page);width:100%;margin:0 auto;padding:0 var(--gutter) var(--s-3);display:flex;align-items:center;gap:var(--s-3);min-height:40px}'
+ '.lback{width:32px;height:32px;font-size:var(--fs-4);box-shadow:none;background:none;color:var(--mut)}'
+ '.lback:disabled{opacity:.35;cursor:default}'
+ '.trail{display:flex;align-items:center;flex-wrap:wrap;gap:0;margin:0;padding:0;list-style:none;font:var(--fs-2)/1.4 var(--font-ui);min-width:0}'
+ '.trail li{display:flex;align-items:center;min-width:0}'
+ '.trail li+li::before{content:"";width:5px;height:5px;margin:0 var(--s-3) 0 var(--s-2);border:solid var(--line-2);border-width:1.5px 1.5px 0 0;transform:rotate(45deg);flex:none}'
+ '.trail button{border:0;background:none;padding:var(--s-1) 0;font:inherit;color:var(--mut);cursor:pointer;white-space:nowrap;'
+ 'text-decoration:underline;text-decoration-color:transparent;text-underline-offset:.2em;transition:color .15s var(--ease),text-decoration-color .15s var(--ease)}'
+ '@media (hover:hover){.trail button:hover{color:var(--ink);text-decoration-color:var(--line-2)}}'
+ '.trail [aria-current]{color:var(--ink);font-weight:600;white-space:nowrap}'
+ '.trail .more{color:var(--mut)}'
+ '.ringkey{margin-left:auto;color:var(--mut);font-size:var(--fs-1);text-align:right}'
  '.mapstage{position:relative;flex:1;display:flex;min-height:0;box-shadow:0 -1px 0 var(--line)}'
  '.ipop,.mapcard{position:absolute;top:var(--s-4);z-index:55;background:rgba(255,253,249,.92);backdrop-filter:blur(14px) saturate(140%);'
  '-webkit-backdrop-filter:blur(14px) saturate(140%);border-radius:var(--r-lg);box-shadow:var(--sh-3);padding:var(--s-4) var(--s-5) var(--s-5)}'
@@ -1121,41 +1196,45 @@ mapdoc = ('<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name
  '.mapcard .cmeta{color:var(--mut);font-size:var(--fs-2);margin-bottom:var(--s-3)}'
  '.mapcard .ck,.mapcard .csec{font:600 11px/1.2 var(--font-ui);letter-spacing:.08em;text-transform:uppercase;color:var(--mut)}'
  '.mapcard .csec{margin:var(--s-4) 0 var(--s-2)}'
- '.mapcard a.cn{display:block;padding:var(--s-2) var(--s-3);margin:var(--s-1) 0;border-radius:var(--r-sm);background:var(--accent-soft);'
- 'color:var(--accent);text-decoration:none;font:600 var(--fs-2)/1.3 var(--font-ui)}'
+ '.mapcard .cdot{display:inline-block;flex:none;width:8px;height:8px;border-radius:50%;margin-right:var(--s-2);vertical-align:1px}'
+ '.mapcard .copen{width:100%;margin:var(--s-1) 0 0}'
+ '.mapcard button.cn{display:flex;align-items:center;width:100%;padding:var(--s-2) var(--s-3);margin:var(--s-1) 0;border:0;border-radius:var(--r-sm);'
+ 'background:var(--sunk);color:var(--ink);font:500 var(--fs-2)/1.3 var(--font-ui);text-align:left;cursor:pointer}'
+ '.mapcard .cc{margin-left:auto;color:var(--mut);font-variant-numeric:tabular-nums}'
+ '@media (hover:hover){.mapcard button.cn:hover{background:var(--hover)}}'
  '.mapcard .chip{display:inline-flex;margin:0 var(--s-1) var(--s-1) 0;padding:6px 10px;border:0;border-radius:999px;background:var(--sunk);'
  'font:500 var(--fs-1)/1 var(--font-ui);color:var(--ink-2);cursor:pointer}'
- '@media (hover:hover){.mapcard a.cn:hover{background:rgba(47,79,179,.15)}.mapcard .chip:hover{color:var(--accent);background:var(--accent-soft)}}'
- '.infobar{max-width:var(--w-page);width:100%;margin:0 auto;padding:var(--s-3) calc(var(--gutter) + 150px) var(--s-3) var(--gutter);font-size:var(--fs-2);color:var(--mut);min-height:20px}'
+ '@media (hover:hover){.mapcard .chip:hover{color:var(--accent);background:var(--accent-soft)}}'
+ '@media (max-width:760px){.ringkey{display:none}.legend{margin-left:0}}'
  '</style></head><body>'
- + tabbar(MAP).replace('class="bar"','class="bar"') +
- '<div class="maphead"><h1>Knowledge map</h1><input id="mapq" class="field" placeholder="Find a concept…">'
+ + tabbar(MAP) +
+ '<div class="maphead"><h1>Knowledge map</h1>'
+ '<input id="mapq" class="field" list="mapnames" placeholder="Go to a note or concept…" autocomplete="off"><datalist id="mapnames"></datalist>'
  '<button class="ibtn" id="ib" title="What am I looking at?">i</button>'
- '<span class="zoom"><button id="zout" title="Zoom out">−</button><button id="zreset" title="Reset view">⟳</button><button id="zin" title="Zoom in">+</button></span>'
  '<span class="legend"><span><span class="dot" style="background:#2f4fb3"></span>note</span>'
  '<span><span class="dot" style="background:#c98a1b"></span>shared concept</span>'
  '<span><span class="dot" style="background:#aba69c"></span>concept</span></span></div>'
- '<div class="mapstage"><canvas id="cv"></canvas><aside id="card" class="mapcard"></aside>'
+ '<nav class="lensbar" aria-label="Where you are on the map"><button class="lback" id="lback" title="Back" aria-label="Back">←</button>'
+ '<ol class="trail" id="trail"></ol><span class="ringkey" id="ringkey"></span></nav>'
+ '<div class="mapstage"><svg id="cv"></svg><aside id="card" class="mapcard"></aside>'
  '<div class="ipop" id="ip"><button class="x" id="ipx">&times;</button>'
- '<h5>Circles &mdash; things</h5>'
+ '<h5>One idea at a time</h5>'
+ '<div>The map shows one note or concept in the middle and what surrounds it. Click any circle to move it to the middle '
+ 'and open its panel; <b>Open note</b> in the panel takes you to the note. The path above the map takes you back.</div>'
+ '<div class="hr"></div><h5>Circles</h5>'
  '<div class="row"><span class="sw"><span class="dt" style="width:15px;height:15px;background:#2f4fb3"></span></span>'
- '<div><b>Note</b> &mdash; one of your topic notes. Click to open it.</div></div>'
+ '<div><b>Note</b> &mdash; one of your topic notes, in its own color.</div></div>'
  '<div class="row"><span class="sw"><span class="dt" style="width:12px;height:12px;background:#c98a1b"></span></span>'
- '<div><b>Concept</b> in several notes. <b>Size</b> = how much the vault is really about it, not how many notes mention it.</div></div>'
+ '<div><b>Concept</b> in several notes. <b>Bigger</b> = it matters more to the note in the middle.</div></div>'
  '<div class="row"><span class="sw"><span class="dt" style="width:8px;height:8px;background:#aba69c"></span></span>'
  '<div><b>Concept</b> in a single note &mdash; the specific ones (OAuth, SAML, DORA).</div></div>'
- '<div class="hr"></div><h5>Lines &mdash; relationships</h5>'
+ '<div class="hr"></div><h5>Lines</h5>'
  '<div class="row"><span class="sw"><span class="ln" style="border-top-width:3px;border-color:#8b93a5"></span></span>'
- '<div><b>note &rarr; concept</b><br>&ldquo;this note talks about this idea.&rdquo; <b>Thicker = the note is more about it</b>: '
- 'weight is <code>times mentioned</code> &times; <code>how rare the word is</code>.</div></div>'
- '<div class="row"><span class="sw"><span class="ln" style="border-top-width:2px;border-color:#10b981"></span></span>'
- '<div><b>concept &harr; concept</b><br>&ldquo;these two ideas travel together&rdquo; &mdash; they show up in the same notes '
- 'in the same proportions. Each concept keeps its 3 strongest partners.</div></div>'
- '<div class="hr"></div>'
- '<div style="color:var(--mut)">A word in <i>every</i> note (trust, roadmap) separates nothing, so it is pushed down; '
- 'a word concentrated in one note pulls hard. Click any concept for its summary card.</div></div>'
+ '<div><b>From the middle</b>: thicker = more about it. Weight is <code>times mentioned</code> &times; <code>how rare the word is</code>, '
+ 'so a word in <i>every</i> note (trust, roadmap) counts for less.</div></div>'
+ '<div class="row"><span class="sw"><span class="ln" style="border-top-width:1.5px;border-color:#8b857b;border-top-style:dashed"></span></span>'
+ '<div><b>Inner to outer ring</b>: how you get there. Hover a circle to light its lines.</div></div></div>'
  '</div>'
- '<div class="infobar" id="info"></div>'
  '<script>const GRAPH='+GRAPH+';'+MAPJS+'</script>'+WN_SNIPPET+SEARCH_JS+'</body></html>')
 open(os.path.join(OUT,MAP),"w",encoding="utf-8").write(mapdoc)
 print("wrote", MAP, f"({len(gnodes)} nodes, {len(glinks)} links)")
