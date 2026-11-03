@@ -359,9 +359,25 @@ its source changes, since a rebuild needs the access granted again.
 - `starter-vault/`: the `Handwritten/` layout a new notes folder starts from.
 - `tests/`: see below.
 
-To tune the pages, edit the lists at the top of `renderer/build_html.py`: `PREF`
-(tab order), `GLOSSARY` (concepts the map always looks for) and `WORD` (words to
-keep upper-case in titles).
+To tune the pages, put a `renderer-config.json` beside your quiz bank (in
+`NOTES_REFS`); every key is optional, and the build scripts stay shared, so a
+`git pull` still updates them:
+
+```json
+{
+  "tab_order": ["Roadmap_note.md", "Cooking_note.md"],
+  "map_terms": ["emergency fund", "mise en place"],
+  "display_names": {"PM_UX": "PM / UX"},
+  "reference_pdfs": ["Some published paper.pdf"]
+}
+```
+
+`tab_order` puts those notes first, `map_terms` are concepts the map always
+looks for, `display_names` rename notes in the quiz, and `reference_pdfs`
+are PDFs shown under their own names rather than as "Notebook scan N".
+`vault` and `out` set the folders when the watcher's settings aren't in play
+(for example a script that rebuilds the pages when you edit a note). See
+`renderer/config.py`.
 
 ## Tests
 

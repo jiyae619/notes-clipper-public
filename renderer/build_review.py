@@ -8,14 +8,14 @@ Writes: <review>/review.html  → user edits, clicks Download corrections (handw
 Usage:  python3 build_review.py /path/to/Handwritten/_review"""
 import json, os, sys, html, urllib.parse
 sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
-import theme
+import theme, config
 
 REVIEW = sys.argv[1] if len(sys.argv) > 1 else os.getcwd()
 STAGING = os.path.join(REVIEW, "staging")
 DATA = json.load(open(os.path.join(REVIEW, "lowconf.json"), encoding="utf-8"))
 esc = lambda s: html.escape(s or "", quote=True)
 
-TOPIC_ORDER = []   # topics listed here come first on the review page
+TOPIC_ORDER = config.load(os.path.dirname(os.path.abspath(__file__))).get("review_topic_order", [])   # listed first
 def keyf(d):
     t = d.get("topic","zzz")
     return (TOPIC_ORDER.index(t) if t in TOPIC_ORDER else 99, d["base"])

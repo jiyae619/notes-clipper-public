@@ -4,26 +4,28 @@ per-page section nav (TOC), and a keyword knowledge map.
 Output: $NOTES_OUT/handwritten-*.html . Reusable each round."""
 import os, re, math, subprocess, urllib.parse, html, json, glob, datetime, shutil, sys
 sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
-import pages, theme
+import pages, theme, config
 
 def js_json(obj, **kw):
     """JSON for embedding inside <script>: '<' is escaped, so text from a capture
     (a quiz question, a title, a keyword) can never close the tag and start its own."""
     return json.dumps(obj, **kw).replace("<", "\\u003c")
 
-# Paths come from the environment (the watcher sets them from watcher.env);
-# the defaults are the README's standard layout.
-VAULT     = os.path.expanduser(os.environ.get("NOTES_VAULT", "~/Documents/Notes"))
+# Your settings (renderer-config.json beside the quiz bank; see config.py).
+# Paths: the environment (the watcher sets it from watcher.env), then the
+# config, then the README's standard layout.
+CONF      = config.load(os.path.dirname(os.path.abspath(__file__)))
+VAULT     = config.path("NOTES_VAULT", CONF, "vault", "~/Documents/Notes")
 NOTES_DIR = os.path.join(VAULT, "Handwritten/notes")
 ARCHIVE   = os.path.join(VAULT, "Handwritten/archive")
-OUT       = os.path.expanduser(os.environ.get("NOTES_OUT", "~/Documents/Notes Pages"))
+OUT       = config.path("NOTES_OUT", CONF, "out", "~/Documents/Notes Pages")
 
 # Handwritten-scan PDFs are named for whatever was scribbled on the scan — fine
 # as a filename, not fine surfaced as a citation — so pages show them as
 # "Notebook scan N". The real filename is still the link target.
 # Filenames of PDFs in archive/ that are published documents, not your scans,
 # shown under their own names. Add yours here.
-_OFFICIAL_DOCS = set()
+_OFFICIAL_DOCS = set(CONF.get("reference_pdfs", []))
 def _scan_labels():
     try:
         pdfs = sorted(f for f in os.listdir(ARCHIVE) if f.lower().endswith(".pdf"))
@@ -43,7 +45,7 @@ if os.path.exists(_MERMAID) and not os.path.exists(os.path.join(OUT, "mermaid.mi
 esc = lambda s: html.escape(s or "", quote=True)
 
 # tab order preference; any other *_note.md appended alphabetically
-PREF = []   # e.g. ["Routing_map_note.md"]; notes not listed follow alphabetically
+PREF = CONF.get("tab_order", [])   # notes not listed follow alphabetically
 found = sorted(os.path.basename(p) for p in glob.glob(os.path.join(NOTES_DIR,"*.md")))
 NOTE_FILES = [f for f in PREF if f in found] + [f for f in found if f not in PREF]
 # Page names already given out live in pages.json beside the quiz bank (pages.py).
@@ -61,6 +63,7 @@ def slug_of(fn):
 # Concepts the knowledge map always looks for. Routing adds more per capture
 # (glossary-extra.json), so this can start empty; add terms you care about.
 GLOSSARY = []
+GLOSSARY += [t for t in CONF.get("map_terms", []) if t not in GLOSSARY]
 # Map keywords proposed by unattended routing runs live in data, not code: the
 # notes-clipper watcher's merge script appends validated terms to this JSON list,
 # so web-derived text never gets written into (or executed as) this script.

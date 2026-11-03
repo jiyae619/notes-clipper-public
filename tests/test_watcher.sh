@@ -350,6 +350,11 @@ python3 "$here/../watcher/merge_proposals.py" --refs "$R" --notes "$N" "$H/p.jso
 check "keywords: one in most notes ('design') is too common, one already mapped is skipped, a distinctive one is added" \
   eval 'grep -q "design.: too common" "$H/out" && grep -q "agent.: already on the map" "$H/out" && grep -q "long tail" "$R/glossary-extra.json" && ! grep -q "\"design\"" "$R/glossary-extra.json"'
 done_home
+new_home; N="$H/Documents/Notes/Handwritten/notes"; echo "the long tail of intents" > "$N/Four_note.md"
+echo '{"map_terms": ["long tail"]}' > "$R/renderer-config.json"; echo '{"keywords":["long tail"]}' > "$H/p.json"
+python3 "$here/../watcher/merge_proposals.py" --refs "$R" --notes "$N" "$H/p.json" > "$H/out" 2>&1
+check "a term from your renderer-config.json already counts as on the map" eval 'grep -q "long tail.: already on the map" "$H/out"'
+done_home
 
 # A proposal field the quiz page doesn't accept must not reach the bank: the
 # quiz builds first, so one bad entry would stop every later rebuild.

@@ -66,7 +66,11 @@ notes = {f[: -len("_note.md")]: open(os.path.join(args.notes, f), encoding="utf-
          for f in os.listdir(args.notes) if f.endswith("_note.md")}
 bank = json.load(open(bank_path, encoding="utf-8"))
 extra = json.load(open(extra_path, encoding="utf-8")) if os.path.exists(extra_path) else []
-known_kw = {k.lower() for k in glossary_in_code() + extra}
+try:   # map terms from the user's renderer-config.json count as on the map too
+    conf_terms = json.load(open(os.path.join(args.refs, "renderer-config.json"), encoding="utf-8")).get("map_terms", [])
+except (OSError, ValueError, AttributeError):
+    conf_terms = []
+known_kw = {k.lower() for k in glossary_in_code() + extra + [t for t in conf_terms if isinstance(t, str)]}
 seen_q = {re.sub(r"\s+", " ", q["q"]).strip().lower() for q in bank}
 
 # Keep each note's existing id prefix (AI_evals -> "evals"); a note with no

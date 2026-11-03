@@ -4,7 +4,7 @@
 Output: $NOTES_OUT/handwritten-quiz.html . Re-run after editing quiz-bank.json."""
 import os, json, html, glob, sys
 sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
-import pages, theme
+import pages, theme, config
 
 def js_json(obj, **kw):
     """JSON for embedding inside <script>: '<' is escaped, so text from a capture
@@ -13,7 +13,8 @@ def js_json(obj, **kw):
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 BANK = os.path.join(HERE, "quiz-bank.json")
-OUT  = os.path.join(os.path.expanduser(os.environ.get("NOTES_OUT", "~/Documents/Notes Pages")), "handwritten-quiz.html")
+CONF = config.load(HERE)   # your settings, renderer-config.json (see config.py)
+OUT  = os.path.join(config.path("NOTES_OUT", CONF, "out", "~/Documents/Notes Pages"), "handwritten-quiz.html")
 
 bank = json.load(open(BANK, encoding="utf-8"))
 
@@ -37,14 +38,14 @@ if errs:
 # Same labelling rule as build_html.py: archive PDFs
 # sorted case-insensitively, minus the downloaded reference docs. The bank keeps
 # the real filenames so every question stays traceable to its scan.
-ARCHIVE = os.path.join(os.path.expanduser(os.environ.get("NOTES_VAULT", "~/Documents/Notes")), "Handwritten/archive")
+ARCHIVE = os.path.join(config.path("NOTES_VAULT", CONF, "vault", "~/Documents/Notes"), "Handwritten/archive")
 # The page each note's questions link to: the same rule build_html.py writes pages by.
 _NOTES_DIR = os.path.join(os.path.dirname(ARCHIVE), "notes")
 PAGES = {pages.stem_of(f): p for f, p in pages.page_names(
     [os.path.basename(x) for x in glob.glob(os.path.join(_NOTES_DIR, "*.md"))], HERE).items()}
 # Filenames of PDFs in archive/ that are published documents, not your scans,
 # shown under their own names. Keep in step with build_html.py.
-_OFFICIAL_DOCS = set()
+_OFFICIAL_DOCS = set(CONF.get("reference_pdfs", []))
 try:
     _pdfs = sorted(f for f in os.listdir(ARCHIVE) if f.lower().endswith(".pdf"))
 except OSError:
@@ -124,7 +125,7 @@ let saved=getSaved();
 const app=document.getElementById('app');
 const byId=id=>BANK.find(q=>q.id===id);
 const NOTES=[...new Set(BANK.map(q=>q.note))];
-const NICE={};   // display names for note stems, e.g. {PM_UX:'PM / UX'}
+const NICE=__NICE__;   // display names for note stems (display_names in the config)
 const nice=n=>NICE[n]||n.replace(/_/g,' ');
 // Each note's page, as build_html.py names it (pages.py); the index if it's gone.
 const slug=n=>PAGES[n]||'handwritten-notes-index.html';
@@ -272,7 +273,7 @@ doc = ('<!doctype html><html lang="en"><head><meta charset="utf-8">'
  + theme.header("handwritten-notes-index.html", "", '<a class="tab" href="handwritten-knowledge-map.html">Map</a>'
                 '<a class="tab active" href="handwritten-quiz.html" aria-current="page">Quiz</a>') +
  '<div class="wrap"><div id="app"></div></div>'
- '<script>const BANK='+js_json(bank, ensure_ascii=False)+';const PAGES='+js_json(PAGES, ensure_ascii=False)+';'+APP+'</script></body></html>')
+ '<script>const BANK='+js_json(bank, ensure_ascii=False)+';const PAGES='+js_json(PAGES, ensure_ascii=False)+';'+APP.replace('__NICE__', js_json(CONF.get("display_names", {}), ensure_ascii=False))+'</script></body></html>')
 
 os.makedirs(os.path.dirname(OUT), exist_ok=True)
 open(OUT,"w",encoding="utf-8").write(doc)

@@ -127,6 +127,22 @@ check "a note called Help gets its own page and can't overwrite the help page" \
 check "pages carry the Notes-Clipper name and the note favicon, and no emoji in the chrome" \
   eval 'grep -q ">Notes-Clipper</a>" "$NOTES_OUT/handwritten-cooking.html" && grep -q "%F0%9F%93%9D" "$NOTES_OUT/handwritten-cooking.html" && ! grep -qE "📓|🕸|🔔|⭐|🏆" "$NOTES_OUT"/handwritten-*.html'
 rm -f "$NOTES_VAULT/Handwritten/notes/"*.md
+# renderer-config.json: personal settings beside the data, read when no
+# environment is set (a note-edit hook), so the scripts themselves stay shared.
+rm -f "$NOTES_VAULT/Handwritten/notes/"*.md "$R/pages.json"; mk "Zeta"; mk "Alpha"; mk "PM_UX"
+printf 'Zeta talks about rare term here\n' >> "$NOTES_VAULT/Handwritten/notes/Zeta_note.md"
+echo '[{"id":"pmux-01","note":"PM_UX","topic":"t","src":"s","q":"q?","opts":["a","b","c","d"],"a":0,"explain":"e"}]' > "$R/quiz-bank.json"
+python3 -c "import json,sys; json.dump({'vault':sys.argv[1],'out':sys.argv[2],'tab_order':['Zeta_note.md'],'map_terms':['rare term'],'display_names':{'PM_UX':'PM / UX'}},open(sys.argv[3],'w'))" "$NOTES_VAULT" "$T/cfgout" "$R/renderer-config.json"
+( unset NOTES_VAULT NOTES_OUT; PATH="/opt/homebrew/bin:/usr/local/bin:$PATH" python3 "$R/build_quiz.py" && PATH="/opt/homebrew/bin:/usr/local/bin:$PATH" python3 "$R/build_html.py" ) > "$T/out" 2>&1
+first_tab() { grep -o 'class="tab[^"]*" href="[^"]*"' "$T/cfgout/handwritten-alpha.html" | head -1 | grep -q "handwritten-zeta.html"; }
+check "with no environment, the config's folders are used" eval '[ -s "$T/cfgout/handwritten-notes-index.html" ]'
+check "...its tab order puts Zeta first" first_tab
+check "...its map terms appear on the map, and its display names in the quiz" \
+  eval 'grep -q "rare term" "$T/cfgout/handwritten-knowledge-map.html" && grep -q "PM / UX" "$T/cfgout/handwritten-quiz.html"'
+echo '{"tab_order": "not a list", "map_terms": [1, 2]' > "$R/renderer-config.json"
+( PATH="/opt/homebrew/bin:/usr/local/bin:$PATH" python3 "$R/build_html.py" ) > "$T/out" 2>&1; rcb=$?
+check "a broken config is ignored: the pages still build with the defaults" eval '[ $rcb = 0 ]'
+rm -f "$R/renderer-config.json" "$NOTES_VAULT/Handwritten/notes/"*.md
 check "diagrams render in Mermaid's strict mode (no script callbacks from diagram text)" \
   eval '! grep -q "securityLevel:.loose" "$here/../renderer/build_html.py" && grep -q "securityLevel:.strict" "$here/../renderer/build_html.py"'
 rm -rf "$T"
