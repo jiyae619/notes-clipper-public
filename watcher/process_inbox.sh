@@ -14,6 +14,16 @@
 # Test without spending tokens: CLIP_CLAUDE_BIN=/bin/echo ./process_inbox.sh
 # (add CLIP_NOTIFY_BIN=/bin/echo to print alerts instead of posting them).
 
+# iCloud can offload vault notes (Optimize Mac Storage), and a launchd job may
+# not download them on read: open() fails with EDEADLK. Re-run this script once
+# under materialize.py, which allows it for this run and everything it starts.
+mat="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/materialize.py"
+if [ -z "${NOTES_MATERIALIZE:-}" ] && [ -x /usr/bin/python3 ] && [ -f "$mat" ]; then
+  export NOTES_MATERIALIZE=1
+  exec /usr/bin/python3 "$mat" /bin/bash "${BASH_SOURCE[0]}" "$@"
+fi
+unset mat
+
 # launchd has a minimal PATH and can't see nvm, where claude lives. install.sh
 # finds claude through your shell and writes its path and a PATH to watcher.env;
 # re-run install.sh after a Node upgrade. yt-dlp is a Homebrew install

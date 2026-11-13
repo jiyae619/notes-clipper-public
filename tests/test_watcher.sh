@@ -48,6 +48,8 @@ if printf '%s\n' "$@" | grep -q "^Check whether these summaries are faithful"; t
   exit 0
 fi
 printf '%s\n' "$@" > "$HOME/claude.args"
+# whether this run may download iCloud-offloaded notes (2 = allowed)
+/usr/bin/python3 -c "import ctypes; print(ctypes.CDLL(None).getiopolicy_np(3, 0))" > "$HOME/claude.iopolicy" 2>/dev/null
 # CLAUDE_DURING: a command run once, mid-routing, like a page saved during a run.
 [ -n "${CLAUDE_DURING:-}" ] && [ ! -e "$HOME/during.ran" ] && { touch "$HOME/during.ran"; eval "$CLAUDE_DURING"; }
 [ "${CLAUDE_ROUTE:-1}" = 1 ] && grep -E '^/.*/processing/.*\.md$' "$HOME/claude.args" | while read -r f; do
@@ -124,7 +126,10 @@ run() {
   for f in "$PR"/failed/*.attempts; do [ -e "$f" ] && age "$f" 20M; done
   run_soon
 }
-run_soon() { HOME="$H" CLIP_NOTIFY_BIN="$H/stubs/notify" bash "$watcher" > "$H/out" 2>&1; rc=$?; }
+# Started the way launchd starts it: with iCloud downloads on read turned off
+# (a shell turns them on, which would hide the 2026-11-13 failure).
+LAUNCHD_LIKE='import ctypes,os,sys; ctypes.CDLL(None).setiopolicy_np(3,0,1); os.execv(sys.argv[1],sys.argv[1:])'
+run_soon() { HOME="$H" CLIP_NOTIFY_BIN="$H/stubs/notify" /usr/bin/python3 -c "$LAUNCHD_LIKE" /bin/bash "$watcher" > "$H/out" 2>&1; rc=$?; }
 alerted() { grep -q "$1" "$H/alerts" 2>/dev/null; }
 no_alerts() { [ ! -s "$H/alerts" ]; }
 sent() { grep -qx "$PR/processing/$1.md" "$H/claude.args" 2>/dev/null; }   # handed to claude
@@ -142,6 +147,10 @@ new_home; cap a; echo png > "$IN/a-img1.png"; echo png > "$IN/a-img2.png"; echo 
 printf 'images:\n  - a-img1.png\n  - a-img2.png\n' > "$H/imgs"; sed -i '' '/^source:/r '"$H/imgs" "$IN/a.md"; run
 check "a routed capture ends in done/ with its images, after claude got its path" \
   eval '[ $rc = 0 ] && sent a && in_state done a && [ -e "$PR/done/a-img1.png" ] && [ -e "$PR/done/a-img2.png" ]'
+# Sep-Nov 2026: iCloud offloaded three topic notes and the launchd run could not
+# open them (EDEADLK), so routing filed into the wrong note and the rebuild failed.
+check "routing runs with iCloud downloads allowed, so offloaded notes can be read" \
+  eval '[ "$(cat "$H/claude.iopolicy" 2>/dev/null)" = 2 ]'
 check "an image still downloading stays in the inbox" eval '[ -e "$IN/a-img3.png.crdownload" ]'
 check "a normal run raises no alert" no_alerts
 check "the watcher itself copies the capture's images into the vault archive" \
@@ -368,6 +377,18 @@ import json,sys; b={q[\"q\"]: q for q in json.load(open(sys.argv[1]))}
 assert \"level\" not in b[\"Odd level?\"] and \"type\" not in b[\"Odd level?\"]
 assert b[\"Good level?\"][\"level\"]==\"apply\" and b[\"Good level?\"][\"type\"]==\"scenario\"
 " "$R/quiz-bank.json" && HOME="$H" NOTES_OUT="$H/pages" python3 "$R/build_quiz.py" >> "$H/out" 2>&1'
+done_home
+
+# The router often names the note by its file (Topic_note) instead of its stem
+# (Topic); on Nov 2 and Nov 13 2026 that dropped every quiz question.
+new_home; N="$H/Documents/Notes/Handwritten/notes"; echo "a note" > "$N/Topic_note.md"
+echo '{"quiz":[{"note":"Topic_note","topic":"t","src":"s","q":"By file name?","opts":["a","b","c","d"],"a":0,"explain":"e"},{"note":"Topic_note.md","topic":"t","src":"s","q":"With extension?","opts":["a","b","c","d"],"a":0,"explain":"e"},{"note":"Other_note","topic":"t","src":"s","q":"No such note?","opts":["a","b","c","d"],"a":0,"explain":"e"}]}' > "$H/p.json"
+python3 "$here/../watcher/merge_proposals.py" --refs "$R" --notes "$N" "$H/p.json" > "$H/out" 2>&1
+check "a quiz question naming its note as Topic_note or Topic_note.md is kept, filed under Topic; a note that doesn't exist is still dropped" \
+  eval 'python3 -c "
+import json,sys; b={q[\"q\"]: q for q in json.load(open(sys.argv[1]))}
+assert b[\"By file name?\"][\"note\"]==\"Topic\" and b[\"With extension?\"][\"note\"]==\"Topic\" and \"No such note?\" not in b
+" "$R/quiz-bank.json"'
 done_home
 
 new_home; N="$H/Documents/Notes/Handwritten/notes"; echo "a note" > "$N/Topic_note.md"; echo "odd" > "$N/Odd<img src=x>_note.md"

@@ -90,6 +90,14 @@ def next_id(note):
 def quiz_problem(e):
     if not isinstance(e, dict):
         return "not an object"
+    # The router is asked for the stem (AI_evals) but often writes the file's
+    # name (AI_evals_note, AI_evals_note.md); both name the same note. Every
+    # question of Nov 2 and Nov 13 2026 was dropped over this.
+    n = e.get("note")
+    if isinstance(n, str) and n not in notes:
+        stem = n.removesuffix(".md").removesuffix("_note")
+        if stem in notes:
+            e["note"] = stem
     if e.get("note") not in notes:
         return f"note {e.get('note')!r} isn't a topic note"
     # Topic notes are created by the router from captured pages, and the note
